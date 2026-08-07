@@ -41,7 +41,10 @@ Status: **Phase 3 complete**. Phases 4–7 pending (see Next Steps).
 ## Repository & GitHub
 
 - Repo initialized at `E:\Web App\Niche-Scope` (git history created this session).
-- Remote: TBD — `gh` CLI is NOT installed on this machine.
+- Remote: `https://github.com/S-Q-Ali/YouTube-Creator-Tool.git` (branch `main`).
+  - **Commit/push workflow**: every session ends with `git add -A && git commit -m "<summary>" && git push`.
+  - Identity (project-local): `S-Q-Ali <syedqasim963@gmail.com>`.
+  - `gh` CLI is NOT installed — create repos on github.com manually and paste the URL.
 - `.gitignore`: covers `.env*`, `.next/`, `node_modules`, plus `data/` (local SQLite DB).
 - `.env.local` is git-ignored; `.env.example` is committed as the template.
 
@@ -186,3 +189,7 @@ Known verified behaviors:
   (+ `fetchChannelByHandle`), `/api/track`, `/videos` page + `ScorecardLookup` UI;
   scorecard.test.ts (8 tests) — **18/18 passing**, typecheck/lint/typegen clean, routes verified live.
   Repo initialized for GitHub.
+- **2026-08-07** (Session 3): added `SESSION.md` (session history), proper project `README.md`,
+  `.gitignore` for `data/`, initialized git, added remote
+  `https://github.com/S-Q-Ali/YouTube-Creator-Tool.git`, merged remote initial commit, pushed `main`.
+  Established commit/push workflow: every session ends with a commit + push.
