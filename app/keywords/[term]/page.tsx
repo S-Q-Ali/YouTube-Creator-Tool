@@ -3,6 +3,8 @@ import { getKeyword, getKeywordSnapshots, getRankedVideos, decodeTerm } from "@/
 import { CompetitionBadge, ScoreBadge } from "@/components/ScoreBadge";
 import Sparkline from "@/components/Sparkline";
 import RerankButton from "@/components/RerankButton";
+import TrackButton from "@/components/TrackButton";
+import { isTracked } from "@/lib/tracking";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,10 @@ export default async function KeywordPage(props: PageProps<"/keywords/[term]">) 
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6">
         <p className="text-xs uppercase tracking-wide text-zinc-500">Keyword</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">{keyword.displayTerm}</h1>
+        <div className="mt-1 flex items-center gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">{keyword.displayTerm}</h1>
+          <TrackButton kind="keyword" refId={term} label={keyword.displayTerm} initial={isTracked("keyword", term)} />
+        </div>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

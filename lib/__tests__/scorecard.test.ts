@@ -71,7 +71,7 @@ describe("scoreLabel", () => {
 
 describe("computeChannelSeoScore", () => {
   it("scores a well-set-up channel", () => {
-    const r = computeChannelSeoScore({
+    const channel = {
       channelId: "UCtest",
       title: "GardenGrow Academy — Vegetable Gardening for Beginners",
       description:
@@ -81,7 +81,8 @@ describe("computeChannelSeoScore", () => {
       videoCount: 120,
       viewCount: 8_000_000,
       channelTags: ["gardening", "vegetable garden", "organic farming", "permaculture", "home garden"],
-    });
+    };
+    const r = computeChannelSeoScore(channel);
     expect(r.checks.length).toBeGreaterThan(0);
     expect(r.checks.every((c) => typeof c.score === "number")).toBe(true);
   });

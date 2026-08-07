@@ -107,11 +107,16 @@ lib/
                      scoreLabel (A-F), seoCheckSections; SeoCheck/SeoResult/SeoInput types
   vphEngine.ts       computeVph (views/hour from video_snapshots, 24h window), getVideoSnapshots
   tracking.ts        addTracked/removeTracked/isTracked/listTracked (tracked_items)
+  snapshot.ts        snapshotTrackedVideos/Channels/Keywords + runAllSnapshots — shared by the
+                     poller and POST /api/competitors/refresh (keyword re-rank is 24h-cached)
+  competitorEngine.ts getCompetitorDashboard → { videos, channels, keywords } with snapshot series,
+                     VPH, 7-day subscriber growth, and current keyword rankings
 app/
   layout.tsx + nav    header nav: Dashboard /, /keywords, /videos, /competitors, /audit, /settings
   page.tsx            dashboard with 4 tool cards
-  keywords/           list page + [term] detail page (uses decodeTerm!)
+  keywords/           list page + [term] detail page (uses decodeTerm!, has Track keyword button)
   videos/             scorecard page (ScorecardLookup)
+  competitors/        tracking dashboard (CompetitorsView)
   api/
     health/ quota/          status endpoints (200 verified)
     keywords/research       POST research seed term
@@ -120,15 +125,18 @@ app/
     videos/lookup           POST {url} -> video SEO + VPH + channel info (400 on bad input)
     channels/lookup         POST {url} -> channel SEO + recent uploads
     track                   POST add/remove, GET list tracked items
+    competitors             GET dashboard JSON (also used by the extension later)
+    competitors/refresh     POST runAllSnapshots + return fresh dashboard
 components/
   ScoreBadge.tsx       ScoreBadge, CompetitionBadge, scoreColor/scoreLabel/competitionColor
   KeywordResearch.tsx  client research form
   ScorecardLookup.tsx  client video/channel scorecard form + result rendering
+  CompetitorsView.tsx  client dashboard: refresh-now + video/channel/keyword sections w/ sparklines
   Sparkline.tsx        tiny SVG sparkline
   RerankButton.tsx     rerank action for detail page
   TrackButton.tsx      add/remove watchlist button
-scripts/poller.ts      hourly snapshot loop for tracked items (10-min dedupe bucket)
-lib/__tests__/         keywordEngine.test.ts (10) + scorecard.test.ts (8) — all passing
+scripts/poller.ts      hourly snapshot loop via lib/snapshot.ts (10-min dedupe bucket)
+lib/__tests__/         keywordEngine (10) + scorecard (8) + competitorEngine (2) — all passing
 ```
 
 ## Scoring Formulas (transparent, documented in code)
@@ -166,17 +174,16 @@ Known verified behaviors:
 - `/api/quota` and `/api/health` return 200 with DB-backed quota JSON
 - Keyword research: seed "keto diet" → ~344 related keywords, top ranked
 - Scorecard: invalid input → 400; `/videos` page renders; track add/list/remove round-trips
+- `/competitors` page renders; `/api/competitors` returns dashboard JSON; `/api/competitors/refresh`
+  returns 200 + summary (0s without an API key)
 
 ## Next Steps (phases)
 
-1. **Phase 4 — Competitor tracking**: wire `tracked_items` into poller (already snapshots),
-   build `/competitors` dashboard (list tracked videos/channels + keyword rankings) with
-   Sparkline charts over `*_snapshots`, show VPH trend per tracked video.
-2. **Phase 5 — Channel audit (OAuth)**: `/audit` + `/settings` with Google OAuth
+1. **Phase 5 — Channel audit (OAuth)**: `/audit` + `/settings` with Google OAuth
    (`youtube.readonly` + `yt-analytics.readonly`), own-channel insights.
-3. **Phase 6 — Chrome MV3 extension** in `/extension`: content script overlay on
+2. **Phase 6 — Chrome MV3 extension** in `/extension`: content script overlay on
    youtube.com fetching `localhost:3000/api/...` (CORS enabled), popup with summary.
-4. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
+3. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
    README polish, first production `npm run build` verification.
 
 ## Changelog
@@ -193,3 +200,10 @@ Known verified behaviors:
   `.gitignore` for `data/`, initialized git, added remote
   `https://github.com/S-Q-Ali/YouTube-Creator-Tool.git`, merged remote initial commit, pushed `main`.
   Established commit/push workflow: every session ends with a commit + push.
+- **2026-08-07** (Session 4): **Phase 4 done** — competitor tracking. `lib/snapshot.ts` (shared
+  poller/refresh logic + 24h-cached keyword re-rank), `lib/competitorEngine.ts` (dashboard with
+  VPH + 7d sub growth + keyword rankings), `lib/db.ts` `closeDb()`, `/api/competitors` GET +
+  `/api/competitors/refresh` POST, `/competitors` page + `CompetitorsView` (refresh-now, sparkline
+  sections, per-row untrack buttons), Track button on keyword detail page, refactored `poller.ts`
+  to use snapshot lib. competitorEngine.test.ts (temp-DB via `DATABASE_DIR`). **20/20 tests**,
+  typegen/typecheck/lint clean, routes verified live.

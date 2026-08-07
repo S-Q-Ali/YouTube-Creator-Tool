@@ -160,3 +160,13 @@ export function getSetting(key: string): string | undefined {
 export function now(): number {
   return Date.now();
 }
+
+/** Close the database handle (used by tests / graceful shutdown). */
+export function closeDb() {
+  try {
+    db?.close();
+  } catch {
+    // ignore already-closed
+  }
+  db = null;
+}
