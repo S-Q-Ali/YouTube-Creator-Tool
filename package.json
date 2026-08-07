@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "setup": "tsx scripts/setup.ts",
     "dev": "next dev",
     "dev:full": "concurrently -n web,poller -c cyan,magenta \"next dev\" \"tsx scripts/poller.ts\"",
     "poller": "tsx scripts/poller.ts",

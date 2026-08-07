@@ -24,6 +24,7 @@ const NAV = [
   { href: "/videos", label: "Scorecard" },
   { href: "/competitors", label: "Competitors" },
   { href: "/audit", label: "Channel Audit" },
+  { href: "/quota", label: "Quota" },
   { href: "/settings", label: "Settings" },
 ];
 

@@ -18,7 +18,7 @@ Features (all selected by user):
 4. Channel audit of your own channel (requires OAuth)
 5. Chrome extension overlay on youtube.com
 
-Status: **Phases 1–6 complete**. Phase 7 pending (see Next Steps).
+Status: **All phases (1–7) complete**. Feature-complete MVP — see "Future Ideas".
 
 ## Tech Stack & Environment
 
@@ -52,10 +52,11 @@ Status: **Phases 1–6 complete**. Phase 7 pending (see Next Steps).
 
 | Script | Purpose |
 |---|---|
+| `npm run setup` | tsx scripts/setup.ts — env bootstrap + creds/DB checklist |
 | `npm run dev` | next dev (Turbopack) |
 | `npm run dev:full` | concurrently: next dev + poller |
 | `npm run poller` | tsx scripts/poller.ts (snapshot loop) |
-| `npm run build` / `start` | production build/run |
+| `npm run build` / `start` | production build/run (verified) |
 | `npm run lint` | eslint . |
 | `npm run typecheck` | tsc --noEmit |
 | `npm run test` | vitest run |
@@ -125,6 +126,7 @@ app/
   competitors/        tracking dashboard (CompetitorsView)
   audit/              own-channel audit dashboard (ConnectCard / stats + daily views sparkline + recent uploads)
   settings/           OAuth connect/disconnect + quota readout + env/redirect info
+  quota/              API quota dashboard (usage bars + last-7-days history)
   api/
     health/ quota/          status endpoints (200 verified)
     keywords/research       POST research seed term
@@ -151,6 +153,7 @@ components/
   RerankButton.tsx     rerank action for detail page
   TrackButton.tsx      add/remove watchlist button
 scripts/poller.ts      hourly snapshot loop via lib/snapshot.ts (10-min dedupe bucket)
+scripts/setup.ts       npm run setup — env bootstrap + creds/DB checklist
 lib/__tests__/         keywordEngine (10) + scorecard (8) + competitorEngine (2) — all passing
 ```
 
@@ -175,12 +178,14 @@ lib/__tests__/         keywordEngine (10) + scorecard (8) + competitorEngine (2)
 ## How to Run / Verify
 
 ```powershell
-npm.cmd run dev          # dev server http://localhost:3000
-npm.cmd run dev:full     # dev + poller
-npm.cmd run test         # 20 tests
+npm.cmd run setup         # one-time env + credentials + DB check
+npm.cmd run dev           # dev server http://localhost:3000
+npm.cmd run dev:full      # dev + poller
+npm.cmd run test          # 20 tests
 npm.cmd run typecheck
 npm.cmd run lint
 node node_modules/next/dist/bin/next typegen   # after route changes
+npm.cmd run build && npm.cmd run start         # production (verified working)
 ```
 
 Known verified behaviors:
@@ -190,10 +195,15 @@ Known verified behaviors:
 - `/competitors` page renders; `/api/competitors` returns dashboard JSON; `/api/competitors/refresh`
   returns 200 + summary (0s without an API key)
 
-## Next Steps (phases)
+## Next Steps
 
-1. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
-   README polish, first production `npm run build` verification.
+All planned phases are complete. Future ideas (not yet planned):
+- YouTube Studio–style export (CSV of keyword rankings, tracked-item trends)
+- Email/push daily digest of watchlist changes
+- Keyword difficulty recalibration against search-volume providers
+- Multi-language / multi-region research (hl/gl) surfaced in the UI
+- Publish the extension to the Chrome Web Store
+- Notifications when a tracked video crosses a VPH threshold
 
 ## Changelog
 
@@ -233,3 +243,9 @@ Known verified behaviors:
   analytics populated); API key verified via real lookup (Never Gonna Give You Up → seo 80,
   actionable 100%/perf 59%). lint clean after removing unused var, node --check all JS OK,
   20/20 tests, all 4 extension endpoints confirmed 200.
+- **2026-08-07** (Session 7): **Phase 7 done** — hardening. `scripts/setup.ts` + `npm run setup`
+  (Node/sqlite check, .env.local bootstrap from example, creds checklist, DB init). New `/quota`
+  page (usage bars + last-7-days history via `getQuotaHistory`) + nav link + dashboard stat cards
+  (keywords, tracked, quota, own-channel) on `/`. README rewritten (features, quick start, credentials,
+  extension, scripts). **Production `npm run build` + `next start` verified** — all 23 routes compile,
+  home/quota/apis 200. typecheck/lint clean, 20/20 tests.

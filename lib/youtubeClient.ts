@@ -50,6 +50,30 @@ export function getQuotaStatus() {
   };
 }
 
+/** Daily usage for the last `days` days (per-UTC-day ledger entries). */
+export function getQuotaHistory(days = 7): { date: string; data: number; search: number }[] {
+  const out: { date: string; data: number; search: number }[] = [];
+  const keys = all<{ key: string; value: string }>(
+    "SELECT key, value FROM settings WHERE key LIKE 'quota:%'"
+  );
+  const byDay = new Map<string, { data: number; search: number }>();
+  for (const { key, value } of keys) {
+    const m = key.match(/^quota:(data|search):(\d{4}-\d{2}-\d{2})$/);
+    if (!m) continue;
+    const bucket = m[1] as "data" | "search";
+    const ymd = m[2];
+    const entry = byDay.get(ymd) ?? { data: 0, search: 0 };
+    entry[bucket] = Number(value);
+    byDay.set(ymd, entry);
+  }
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    out.push({ date: ymd, ...(byDay.get(ymd) ?? { data: 0, search: 0 }) });
+  }
+  return out;
+}
+
 function recordQuota(bucket: "data" | "search", units: number) {
   const key = quotaKey(bucket);
   const used = Number(get<{ value: string }>("SELECT value FROM settings WHERE key = $key", { key })?.value ?? 0);
