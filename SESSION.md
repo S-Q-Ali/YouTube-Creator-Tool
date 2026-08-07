@@ -18,7 +18,7 @@ Features (all selected by user):
 4. Channel audit of your own channel (requires OAuth)
 5. Chrome extension overlay on youtube.com
 
-Status: **Phase 3 complete**. Phases 4–7 pending (see Next Steps).
+Status: **Phases 1–5 complete**. Phases 6–7 pending (see Next Steps).
 
 ## Tech Stack & Environment
 
@@ -107,16 +107,24 @@ lib/
                      scoreLabel (A-F), seoCheckSections; SeoCheck/SeoResult/SeoInput types
   vphEngine.ts       computeVph (views/hour from video_snapshots, 24h window), getVideoSnapshots
   tracking.ts        addTracked/removeTracked/isTracked/listTracked (tracked_items)
-  snapshot.ts        snapshotTrackedVideos/Channels/Keywords + runAllSnapshots — shared by the
+snapshot.ts        snapshotTrackedVideos/Channels/Keywords + runAllSnapshots — shared by the
                      poller and POST /api/competitors/refresh (keyword re-rank is 24h-cached)
   competitorEngine.ts getCompetitorDashboard → { videos, channels, keywords } with snapshot series,
                      VPH, 7-day subscriber growth, and current keyword rankings
+  oauth.ts           OAuth core: consent URL + CSRF state, code/refresh token exchange, persisted
+                     token storage (settings table), getValidAccessToken (auto-refresh), clearOAuth,
+                     isConnected/oauthChannelId/oauthEnabled, redirectUri
+  ownanalytics.ts    OAuth-authenticated calls: fetchOwnChannel (mine=true), fetchChannelAnalytics
+                     (youtubeanalytics reports, totals + per-day), getOwnAudit, snapshotOwnChannel,
+                     getOwnRecentVideos (from local cache)
 app/
   layout.tsx + nav    header nav: Dashboard /, /keywords, /videos, /competitors, /audit, /settings
   page.tsx            dashboard with 4 tool cards
   keywords/           list page + [term] detail page (uses decodeTerm!, has Track keyword button)
   videos/             scorecard page (ScorecardLookup)
   competitors/        tracking dashboard (CompetitorsView)
+  audit/              own-channel audit dashboard (ConnectCard / stats + daily views sparkline + recent uploads)
+  settings/           OAuth connect/disconnect + quota readout + env/redirect info
   api/
     health/ quota/          status endpoints (200 verified)
     keywords/research       POST research seed term
@@ -125,13 +133,20 @@ app/
     videos/lookup           POST {url} -> video SEO + VPH + channel info (400 on bad input)
     channels/lookup         POST {url} -> channel SEO + recent uploads
     track                   POST add/remove, GET list tracked items
-    competitors             GET dashboard JSON (also used by the extension later)
+    competitors             GET dashboard JSON
     competitors/refresh     POST runAllSnapshots + return fresh dashboard
+    auth/start              GET 302 → Google consent (sets oauth_state cookie)
+    auth/callback           GET exchange code → store tokens → redirect /audit (CSRF-state checked)
+    auth/status             GET { connected }
+    auth/logout             POST clear OAuth tokens
+    audit                   GET/POST own-channel audit (analytics + cached recent uploads)
 components/
   ScoreBadge.tsx       ScoreBadge, CompetitionBadge, scoreColor/scoreLabel/competitionColor
   KeywordResearch.tsx  client research form
   ScorecardLookup.tsx  client video/channel scorecard form + result rendering
   CompetitorsView.tsx  client dashboard: refresh-now + video/channel/keyword sections w/ sparklines
+  ConnectCard.tsx      client: Connect-with-Google link or Disconnect button
+  RefreshButton.tsx    client: POST /api/audit + router.refresh()
   Sparkline.tsx        tiny SVG sparkline
   RerankButton.tsx     rerank action for detail page
   TrackButton.tsx      add/remove watchlist button
@@ -152,19 +167,17 @@ lib/__tests__/         keywordEngine (10) + scorecard (8) + competitorEngine (2)
 
 ## API Key / Quota Status
 
-- `.env.local` currently has EMPTY `YOUTUBE_API_KEY`. With no key:
-  - autocomplete still works (keyless)
-  - ranked competition degrades to Low(0) — `requireApiKey()` gates it
-  - lookup routes return a clean "API key required" error until key added
-- To go live: add key to `.env.local`, restart dev server. Quota ledger resets daily.
-- The free quota (10K data units/day) covers ~all lookup use-cases; `search.list` is capped at 100/day.
+- `YOUTUBE_API_KEY` is **set** (added by user) — all live YouTube calls work.
+- OAuth creds (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) are **set**; consent redirect is
+  `http://localhost:3000/api/auth/callback`. OAuth scopes: `youtube.readonly` + `yt-analytics.readonly`.
+- Quota: 10K data units/day + 100 search.list/day, per-UTC-day in `settings` (OAuth calls also count).
 
 ## How to Run / Verify
 
 ```powershell
 npm.cmd run dev          # dev server http://localhost:3000
 npm.cmd run dev:full     # dev + poller
-npm.cmd run test         # 18 tests
+npm.cmd run test         # 20 tests
 npm.cmd run typecheck
 npm.cmd run lint
 node node_modules/next/dist/bin/next typegen   # after route changes
@@ -179,11 +192,9 @@ Known verified behaviors:
 
 ## Next Steps (phases)
 
-1. **Phase 5 — Channel audit (OAuth)**: `/audit` + `/settings` with Google OAuth
-   (`youtube.readonly` + `yt-analytics.readonly`), own-channel insights.
-2. **Phase 6 — Chrome MV3 extension** in `/extension`: content script overlay on
+1. **Phase 6 — Chrome MV3 extension** in `/extension`: content script overlay on
    youtube.com fetching `localhost:3000/api/...` (CORS enabled), popup with summary.
-3. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
+2. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
    README polish, first production `npm run build` verification.
 
 ## Changelog
@@ -207,3 +218,11 @@ Known verified behaviors:
   sections, per-row untrack buttons), Track button on keyword detail page, refactored `poller.ts`
   to use snapshot lib. competitorEngine.test.ts (temp-DB via `DATABASE_DIR`). **20/20 tests**,
   typegen/typecheck/lint clean, routes verified live.
+- **2026-08-07** (Session 5): **Phase 5 done** — OAuth channel audit. `lib/oauth.ts` (consent URL +
+  CSRF state cookie, code/refresh token exchange, persisted tokens, auto-refresh),
+  `lib/ownanalytics.ts` (fetchOwnChannel via mine=true, youtubeanalytics reports totals+per-day,
+  getOwnAudit, snapshotOwnChannel, getOwnRecentVideos). API routes /api/auth/{start,callback,status,logout}
+  + /api/audit. Pages /settings (connect/disconnect + quota readout) and /audit (channel stats,
+  28-day analytics cards + daily-views sparkline + cached recent uploads). Components ConnectCard,
+  RefreshButton. tokens stored in `settings` table. **20/20 tests**, typegen/typecheck/lint clean,
+  live-verified: /settings & /audit 200, /api/auth/start 302→Google consent, auth/status → connected:false.
