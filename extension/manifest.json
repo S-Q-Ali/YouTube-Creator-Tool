@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Niche-Scope",
+  "version": "0.1.0",
+  "description": "vidIQ-style SEO scores, letter grades and VPH overlaid on YouTube, backed by your local Niche-Scope server.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost:3000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Niche-Scope"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

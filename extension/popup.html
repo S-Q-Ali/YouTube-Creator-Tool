@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        width: 300px;
+        margin: 0;
+        font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
+        color: #0f0f0f;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, #dc2626, #9f1239);
+        color: #fff;
+      }
+      header .logo {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: #fff;
+        color: #dc2626;
+        font-weight: 800;
+        font-size: 12px;
+      }
+      header h1 { margin: 0; font-size: 14px; font-weight: 700; }
+      header small { margin-left: auto; opacity: 0.85; }
+      main { padding: 12px 14px; }
+      .card {
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .card .label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #8a8a8a;
+        font-weight: 700;
+      }
+      .card .value { font-size: 15px; font-weight: 700; margin-top: 2px; }
+      .row { display: flex; gap: 8px; }
+      .row .card { flex: 1; }
+      .status { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #d1d5db; }
+      .dot.on { background: #16a34a; }
+      .dot.off { background: #dc2626; }
+      .err { color: #b91c1c; font-size: 12px; line-height: 1.5; }
+      footer { padding: 10px 14px 12px; border-top: 1px solid #f0f0f0; }
+      footer a { color: #2563eb; text-decoration: none; font-size: 12px; }
+      footer a:hover { text-decoration: underline; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="logo">NS</span>
+      <h1>Niche-Scope</h1>
+      <small>local</small>
+    </header>
+    <main>
+      <div class="status"><span class="dot" id="dot"></span><span id="serverText">Checking server…</span></div>
+      <div id="body">
+        <div class="card"><div class="label">Loading…</div></div>
+      </div>
+    </main>
+    <footer>
+      <a href="http://localhost:3000" target="_blank" rel="noopener">Open dashboard →</a>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

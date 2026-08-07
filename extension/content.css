@@ -1,0 +1,2 @@
+/* Minimal global styles for injected thumbnails. The floating card uses Shadow DOM
+ * (styled inline in content.js) so it can't be clobbered by YouTube's CSS. */

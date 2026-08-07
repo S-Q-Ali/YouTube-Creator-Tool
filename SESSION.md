@@ -18,7 +18,7 @@ Features (all selected by user):
 4. Channel audit of your own channel (requires OAuth)
 5. Chrome extension overlay on youtube.com
 
-Status: **Phases 1–5 complete**. Phases 6–7 pending (see Next Steps).
+Status: **Phases 1–6 complete**. Phase 7 pending (see Next Steps).
 
 ## Tech Stack & Environment
 
@@ -192,9 +192,7 @@ Known verified behaviors:
 
 ## Next Steps (phases)
 
-1. **Phase 6 — Chrome MV3 extension** in `/extension`: content script overlay on
-   youtube.com fetching `localhost:3000/api/...` (CORS enabled), popup with summary.
-2. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
+1. **Phase 7 — Hardening**: setup script (`npm run setup`), quota dashboard page,
    README polish, first production `npm run build` verification.
 
 ## Changelog
@@ -226,3 +224,12 @@ Known verified behaviors:
   28-day analytics cards + daily-views sparkline + cached recent uploads). Components ConnectCard,
   RefreshButton. tokens stored in `settings` table. **20/20 tests**, typegen/typecheck/lint clean,
   live-verified: /settings & /audit 200, /api/auth/start 302→Google consent, auth/status → connected:false.
+- **2026-08-07** (Session 6): **Phase 6 done** — Chrome MV3 extension in `/extension`.
+  `manifest.json` (host_permissions `http://localhost:3000/*`), `background.js` (message proxy +
+  10-min `chrome.storage.session` cache), `content.js` (watch-page floating card via Shadow DOM +
+  thumbnail score pills with MutationObserver + History-API re-route), `popup.html/popup.js`
+  (server status, quota, tracked counts, audit status), `content.css`, `README.md`.
+  No build step — load unpacked. OAuth round-trip VERIFIED live (user connected "MovieMinds USA",
+  analytics populated); API key verified via real lookup (Never Gonna Give You Up → seo 80,
+  actionable 100%/perf 59%). lint clean after removing unused var, node --check all JS OK,
+  20/20 tests, all 4 extension endpoints confirmed 200.
