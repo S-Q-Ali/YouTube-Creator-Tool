@@ -3,6 +3,8 @@ import { getQuotaStatus } from "@/lib/youtubeClient";
 import { isConnected } from "@/lib/oauth";
 import { listTracked } from "@/lib/tracking";
 import { getCachedKeywords } from "@/lib/keywordEngine";
+import { getTrendingChannels } from "@/lib/trendingEngine";
+import { TrendingChannelsGrid } from "@/components/TrendingChannelsGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,7 @@ export default function Home() {
   const connected = isConnected();
   const tracked = listTracked();
   const keywordCount = getCachedKeywords(undefined, 1).length;
+  const trendingChannels = getTrendingChannels("all", "all", 20, 0);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -72,6 +75,10 @@ export default function Home() {
           <p className="mt-1 text-2xl font-semibold">{connected ? "Connected" : "Not connected"}</p>
           <Link href="/settings" className="text-xs text-red-600 hover:underline dark:text-red-400">{connected ? "Manage" : "Connect"} →</Link>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <TrendingChannelsGrid initialChannels={trendingChannels} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

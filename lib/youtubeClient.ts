@@ -83,7 +83,7 @@ function recordQuota(bucket: "data" | "search", units: number) {
   );
 }
 
-async function ytFetch<T>(endpoint: string, params: Record<string, string>, bucket: "data" | "search", retries = 3): Promise<T> {
+export async function ytFetch<T>(endpoint: string, params: Record<string, string>, bucket: "data" | "search", retries = 3): Promise<T> {
   const key = requireApiKey();
   const { used, limit } = getQuotaUsage(bucket);
   if (used >= limit) throw new QuotaExceededError();
@@ -95,14 +95,21 @@ async function ytFetch<T>(endpoint: string, params: Record<string, string>, buck
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
-      if (res.status === 429) throw new RateLimitedError();
+      if (res.status === 429) {
+        const body429 = await res.json().catch(() => ({})) as { error?: { message?: string; errors?: { reason?: string }[] } };
+        const reason429 = body429.error?.errors?.[0]?.reason ?? body429.error?.message ?? "";
+        if (reason429.toLowerCase().includes("quota") || reason429.toLowerCase().includes("rate")) {
+          throw new QuotaExceededError();
+        }
+        throw new RateLimitedError();
+      }
       const body = (await res.json()) as T & { error?: { code: number; message: string; errors?: { reason: string }[] } };
       if (!res.ok) {
         const reason = body.error?.errors?.[0]?.reason ?? body.error?.message ?? res.statusText;
         if (reason === "quotaExceeded") throw new QuotaExceededError();
         throw new YoutubeApiError(body.error?.message ?? "YouTube API request failed", reason, res.status);
       }
-      recordQuota(bucket, 1);
+      recordQuota(bucket, bucket === "search" ? 100 : 1);
       return body;
     } catch (err) {
       if (err instanceof QuotaExceededError || err instanceof RateLimitedError) throw err;

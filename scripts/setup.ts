@@ -40,7 +40,7 @@ async function main() {
 
   console.log("\n2. Dependencies");
   try {
-    execSync("npm.cmd ls next react --depth=0", { stdio: "pipe" });
+    execSync("npm ls next react --depth=0", { stdio: "pipe" });
     check("next/react installed", true);
   } catch {
     console.log("  ! Run `npm install` first.");

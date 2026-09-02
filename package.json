@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "dev": "next dev",
-    "dev:full": "concurrently -n web,poller -c cyan,magenta \"next dev\" \"tsx scripts/poller.ts\"",
+    "dev": "next dev --webpack",
+    "dev:full": "concurrently -n web,poller -c cyan,magenta \"next dev --webpack\" \"tsx scripts/poller.ts\"",
     "poller": "tsx scripts/poller.ts",
     "build": "next build",
     "start": "next start",
@@ -30,5 +30,9 @@
     "tsx": "^4.23.9",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }
