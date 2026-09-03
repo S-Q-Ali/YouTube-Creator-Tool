@@ -1,6 +1,9 @@
 import { all, get, run } from "./db";
 import { fetchChannels, fetchVideos, ytFetch, getQuotaUsage, QuotaExceededError, RateLimitedError } from "./youtubeClient";
 import type { ChannelInfo, VideoInfo } from "./types";
+import { VIDEO_FORMATS, FORMAT_NICHES, type Niche, type VideoFormat } from "./niches";
+
+export { VIDEO_FORMATS, FORMAT_NICHES, type Niche, type VideoFormat } from "./niches";
 
 export interface TrendingChannel {
   channelId: string;
@@ -21,63 +24,6 @@ export interface TrendingChannel {
   avgViewsPerVideo: number;
   isNewlyCreated: boolean;
 }
-
-export interface VideoFormat {
-  id: string;
-  name: string;
-  ratio: string;
-}
-
-export interface Niche {
-  id: string;
-  name: string;
-  queries: string[];
-}
-
-export const VIDEO_FORMATS: VideoFormat[] = [
-  { id: "longform", name: "Long Form", ratio: "16:9" },
-  { id: "shortform", name: "Short Form", ratio: "9:16" },
-];
-
-export const FORMAT_NICHES: Record<string, Niche[]> = {
-  longform: [
-    { id: "ai_tech", name: "AI & Tech", queries: ["AI tutorial", "tech review 2026", "AI tools guide", "machine learning tutorial"] },
-    { id: "finance", name: "Finance & Investing", queries: ["investing tutorial", "personal finance guide", "stock market explained", "crypto tutorial"] },
-    { id: "education", name: "Education", queries: ["how to tutorial", "learn explained", "educational guide", "deep dive explained"] },
-    { id: "documentary", name: "Documentary", queries: ["documentary full", "investigative documentary", "true story documentary"] },
-    { id: "diy_crafts", name: "DIY & Crafts", queries: ["DIY project tutorial", "woodworking project", "craft tutorial", "home improvement"] },
-    { id: "cooking", name: "Cooking & Recipes", queries: ["cooking recipe tutorial", "baking recipe", "cooking full video", "chef tutorial"] },
-    { id: "fitness_health", name: "Fitness & Health", queries: ["workout tutorial", "fitness guide", "health tips", "nutrition guide"] },
-    { id: "gaming", name: "Gaming", queries: ["gaming walkthrough", "game review 2026", "gameplay full", "gaming tutorial"] },
-    { id: "business", name: "Business & Entrepreneurship", queries: ["business case study", "startup story", "entrepreneur tutorial", "business strategy"] },
-    { id: "true_crime", name: "True Crime", queries: ["true crime documentary", "unsolved case", "criminal psychology", "mystery investigation"] },
-    { id: "space_science", name: "Space & Science", queries: ["space documentary", "astronomy explained", "science deep dive", "NASA documentary"] },
-    { id: "self_improvement", name: "Self-Improvement", queries: ["stoicism tutorial", "self improvement guide", "mental health tips", "productivity guide"] },
-    { id: "ai_faceless", name: "AI Faceless Channels", queries: ["faceless channel tutorial", "AI voiceover channel", "faceless YouTube automation", "no face channel"] },
-  ],
-  shortform: [
-    { id: "entertainment", name: "Entertainment", queries: ["shorts viral", "shorts funny", "shorts trending", "entertainment shorts"] },
-    { id: "food_drink", name: "Food & Drink", queries: ["shorts food", "recipe shorts", "cooking shorts", "food review shorts"] },
-    { id: "gaming", name: "Gaming", queries: ["gaming shorts", "Roblox shorts", "Minecraft shorts", "game clip shorts"] },
-    { id: "sports", name: "Sports", queries: ["sports highlights", "sports moments", "athletic shorts", "action sports"] },
-    { id: "crafting", name: "Crafting & DIY", queries: ["craft shorts", "DIY shorts", "satisfying craft", "art process shorts"] },
-    { id: "comedy", name: "Comedy & Skits", queries: ["funny shorts", "comedy shorts", "skit shorts", "humor shorts"] },
-    { id: "dance_challenges", name: "Dance & Challenges", queries: ["dance shorts", "viral challenge", "trending dance", "challenge shorts"] },
-    { id: "motivation", name: "Motivation", queries: ["motivational shorts", "inspirational quotes", "self improvement shorts"] },
-    { id: "finance_tips", name: "Finance Tips", queries: ["money tips shorts", "investing shorts", "financial advice shorts"] },
-    { id: "tech_ai", name: "Tech & AI News", queries: ["tech news shorts", "AI news shorts", "gadget review shorts"] },
-    { id: "facts_trivia", name: "Did You Know Facts", queries: ["did you know shorts", "fun facts shorts", "amazing facts", "educational shorts"] },
-    { id: "scary_stories", name: "Scary Stories", queries: ["horror shorts", "scary story shorts", "creepy shorts", "horror story"] },
-    { id: "commentary", name: "Commentary", queries: ["commentary shorts", "reaction shorts", "viral clip reaction"] },
-    { id: "animals", name: "Animals & Pets", queries: ["cute animals shorts", "funny animals", "pet shorts", "animal facts shorts"] },
-    { id: "cars", name: "Cars & Racing", queries: ["car shorts", "supercar shorts", "racing shorts", "car review shorts"] },
-    { id: "animation", name: "Animation", queries: ["animation shorts", "2D animation shorts", "3D animation shorts", "animated shorts"] },
-    { id: "news", name: "News & Current Events", queries: ["news shorts", "breaking news shorts", "current events shorts"] },
-    { id: "asmr", name: "ASMR", queries: ["ASMR shorts", "satisfying shorts", "relaxing shorts", "oddly satisfying"] },
-    { id: "beauty_fashion", name: "Beauty & Fashion", queries: ["makeup shorts", "fashion shorts", "outfit ideas", "beauty tips shorts"] },
-    { id: "family", name: "Family & Parenting", queries: ["family shorts", "parenting shorts", "baby shorts", "family moments"] },
-  ],
-};
 
 export const YOUTUBE_CATEGORIES: { id: string; name: string; order: number }[] = [
   { id: "faceless", name: "AI Faceless Channels", order: 0 },
@@ -428,7 +374,8 @@ export function getTrendingChannelById(channelId: string): TrendingChannel | nul
       view_count AS viewCount,
       video_count AS videoCount,
       published_at AS publishedAt,
-      category_id AS categoryId,
+      video_format AS videoFormat,
+      niche,
       category_name AS categoryName,
       viral_score AS viralScore,
       growth_rate AS growthRate,

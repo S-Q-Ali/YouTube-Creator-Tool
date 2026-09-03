@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { FormatDropdown } from "./FormatDropdown";
 import { CategoryDropdown } from "./CategoryDropdown";
 import { TrendingChannelCard } from "./TrendingChannelCard";
+import { AnalysisModal } from "./AnalysisModal";
+import { FORMAT_NICHES } from "@/lib/niches";
 
 interface TrendingChannel {
   channelId: string;
@@ -38,6 +40,12 @@ interface TrendingChannelsGridProps {
   initialChannels?: TrendingChannel[];
 }
 
+function getNicheRpm(videoFormat: string, nicheId: string): { min: number; max: number; avg: number } | undefined {
+  const niches = FORMAT_NICHES[videoFormat] || [];
+  const niche = niches.find((n) => n.id === nicheId);
+  return niche?.rpm;
+}
+
 function formatTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -62,6 +70,8 @@ export function TrendingChannelsGrid({
   const [quota, setQuota] = useState<QuotaInfo | null>(null);
   const [discoveryStatus, setDiscoveryStatus] = useState<DiscoveryInfo[]>([]);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
   const fetchChannels = async (format: string, niche: string, pageNum: number) => {
     setLoading(true);
@@ -124,6 +134,16 @@ export function TrendingChannelsGrid({
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleAnalyze = (channelId: string) => {
+    setSelectedChannelId(channelId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedChannelId(null);
   };
 
   const currentNicheStatus = discoveryStatus.find(
@@ -253,7 +273,12 @@ export function TrendingChannelsGrid({
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {channels.map((channel) => (
-              <TrendingChannelCard key={channel.channelId} channel={channel} />
+              <TrendingChannelCard
+                key={channel.channelId}
+                channel={channel}
+                nicheRpm={getNicheRpm(channel.videoFormat, channel.niche)}
+                onAnalyze={handleAnalyze}
+              />
             ))}
           </div>
 
@@ -279,6 +304,14 @@ export function TrendingChannelsGrid({
             </div>
           )}
         </>
+      )}
+
+      {/* Analysis Modal */}
+      {modalOpen && selectedChannelId && (
+        <AnalysisModal
+          channelId={selectedChannelId}
+          onClose={handleCloseModal}
+        />
       )}
     </div>
   );

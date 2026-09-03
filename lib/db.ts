@@ -194,9 +194,81 @@ CREATE INDEX IF NOT EXISTS idx_similar_analysis_source ON similar_channel_analys
 CREATE INDEX IF NOT EXISTS idx_content_ideas_channel ON channel_content_ideas(channel_id);
 CREATE INDEX IF NOT EXISTS idx_scripts_channel ON channel_scripts(channel_id);
 CREATE INDEX IF NOT EXISTS idx_blueprints_channel ON channel_growth_blueprints(channel_id);
+
+CREATE TABLE IF NOT EXISTS production_board (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'idea',
+  priority TEXT DEFAULT 'medium',
+  format TEXT DEFAULT 'longform',
+  niche TEXT DEFAULT '',
+  channel_id TEXT DEFAULT '',
+  due_date TEXT DEFAULT '',
+  tags TEXT DEFAULT '[]',
+  position INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_production_status ON production_board(status);
+CREATE INDEX IF NOT EXISTS idx_production_priority ON production_board(priority);
 `;
 
+// Niche ID migration: old → new
+const NICHE_MIGRATIONS: { oldId: string; newId: string | null; format: string }[] = [
+  // Long form renames
+  { oldId: "ai_tech", newId: "tech_ai", format: "longform" },
+  { oldId: "fitness_health", newId: "health", format: "longform" },
+  { oldId: "diy_crafts", newId: "diy", format: "longform" },
+  { oldId: "ai_faceless", newId: "faceless", format: "longform" },
+  { oldId: "space_science", newId: "documentary", format: "longform" },
+  // Long form removals (merge into documentary or delete)
+  { oldId: "self_improvement", newId: null, format: "longform" },
+  // Short form renames
+  { oldId: "food_drink", newId: "cooking", format: "shortform" },
+  { oldId: "crafting", newId: "diy", format: "shortform" },
+  { oldId: "finance_tips", newId: "finance", format: "shortform" },
+  { oldId: "facts_trivia", newId: "facts", format: "shortform" },
+  // Short form removals
+  { oldId: "entertainment", newId: null, format: "shortform" },
+  { oldId: "sports", newId: null, format: "shortform" },
+  { oldId: "dance_challenges", newId: null, format: "shortform" },
+  { oldId: "scary_stories", newId: null, format: "shortform" },
+  { oldId: "commentary", newId: null, format: "shortform" },
+  { oldId: "cars", newId: null, format: "shortform" },
+  { oldId: "animation", newId: null, format: "shortform" },
+  { oldId: "news", newId: null, format: "shortform" },
+  { oldId: "asmr", newId: null, format: "shortform" },
+  { oldId: "family", newId: null, format: "shortform" },
+];
+
 let db: DatabaseSync | null = null;
+
+function migrateNicheIds(d: DatabaseSync) {
+  // Check if migration already ran
+  const migrated = d.prepare("SELECT value FROM settings WHERE key = $key").get({ key: "niche_migration_v2" }) as { value: string } | undefined;
+  if (migrated) return;
+
+  console.log("Running niche ID migration...");
+
+  for (const { oldId, newId, format } of NICHE_MIGRATIONS) {
+    if (newId) {
+      // Rename: update trending_channels
+      d.prepare("UPDATE trending_channels SET niche = $newId WHERE niche = $oldId AND video_format = $format").run({ newId, oldId, format });
+      // Rename: update discovery_log
+      d.prepare("UPDATE discovery_log SET niche = $newId WHERE niche = $oldId AND video_format = $format").run({ newId, oldId, format });
+      console.log(`  Renamed ${format}/${oldId} → ${newId}`);
+    } else {
+      // Delete: remove rows with this niche
+      const tc = d.prepare("DELETE FROM trending_channels WHERE niche = $oldId AND video_format = $format").run({ oldId, format }) as { changes: number };
+      const dl = d.prepare("DELETE FROM discovery_log WHERE niche = $oldId AND video_format = $format").run({ oldId, format }) as { changes: number };
+      console.log(`  Deleted ${format}/${oldId} (${tc.changes} channels, ${dl.changes} log entries)`);
+    }
+  }
+
+  d.prepare("INSERT INTO settings (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = $value").run({ key: "niche_migration_v2", value: "done" });
+  console.log("Niche migration complete.");
+}
 
 function open(): DatabaseSync {
   if (db) return db;
@@ -205,6 +277,7 @@ function open(): DatabaseSync {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
+  migrateNicheIds(db);
   return db;
 }
 

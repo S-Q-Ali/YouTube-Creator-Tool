@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface TrendingChannelCardProps {
@@ -16,13 +15,25 @@ interface TrendingChannelCardProps {
     isNewlyCreated: boolean;
     categoryName: string;
     viewSubRatio: number;
+    niche?: string;
+    videoFormat?: string;
   };
+  nicheRpm?: { min: number; max: number; avg: number };
+  onAnalyze: (channelId: string) => void;
 }
 
 function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
   return String(num);
+}
+
+function formatEarnings(rpm: { min: number; max: number; avg: number }, views: number): string {
+  const per1k = views / 1000;
+  const minEarn = Math.round(per1k * rpm.min);
+  const maxEarn = Math.round(per1k * rpm.max);
+  if (minEarn >= 1000) return `$${(minEarn / 1000).toFixed(1)}K-$${(maxEarn / 1000).toFixed(1)}K`;
+  return `$${minEarn}-$${maxEarn}`;
 }
 
 function getViralScoreColor(score: number): string {
@@ -47,13 +58,8 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export function TrendingChannelCard({ channel }: TrendingChannelCardProps) {
-  const router = useRouter();
+export function TrendingChannelCard({ channel, nicheRpm, onAnalyze }: TrendingChannelCardProps) {
   const [imgError, setImgError] = useState(false);
-
-  const handleAnalyze = () => {
-    router.push(`/similar/${channel.channelId}`);
-  };
 
   const showImage = channel.thumbnailUrl && !imgError;
 
@@ -134,8 +140,20 @@ export function TrendingChannelCard({ channel }: TrendingChannelCardProps) {
         </p>
       </div>
 
+      {nicheRpm && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1.5 dark:bg-green-900/20">
+          <span className="text-xs">💰</span>
+          <span className="text-xs font-semibold text-green-700 dark:text-green-400">
+            Est. {formatEarnings(nicheRpm, channel.viewCount)}/total
+          </span>
+          <span className="text-[10px] text-green-600/70 dark:text-green-400/60">
+            (RPM ${nicheRpm.avg})
+          </span>
+        </div>
+      )}
+
       <button
-        onClick={handleAnalyze}
+        onClick={() => onAnalyze(channel.channelId)}
         className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
       >
         Create Similar Channel

@@ -87,6 +87,37 @@ function getProviders(): AIProvider[] {
     });
   }
 
+  if (process.env.AIHUBMIX_API_KEY) {
+    providers.push({
+      name: "aihubmix",
+      apiKey: process.env.AIHUBMIX_API_KEY,
+      baseUrl: "https://aihubmix.com/v1",
+      model: "qwen3.7-plus-preview-free",
+      maxTokens: 4096,
+      formatRequest: (prompt: string) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.AIHUBMIX_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "qwen3.7-plus-preview-free",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 4096,
+          temperature: 0.7,
+        }),
+      }),
+      parseResponse: async (res: Response) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await res.json();
+        if (data.error) {
+          throw new Error(`AiHubMix error: ${data.error.message || JSON.stringify(data.error)}`);
+        }
+        return stripThinkingTags(data.choices?.[0]?.message?.content || "");
+      },
+    });
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     providers.push({
       name: "openrouter",
@@ -272,7 +303,7 @@ export async function analyzeChannel(
 ): Promise<ChannelAnalysis> {
   const providers = getProviders();
   if (providers.length === 0) {
-    throw new Error("No AI providers configured. Add GOOGLE_AI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY to .env.local");
+    throw new Error("No AI providers configured. Add GROQ_API_KEY, AIHUBMIX_API_KEY, or OPENROUTER_API_KEY to .env.local");
   }
 
   const prompt = buildAnalysisPrompt(channel, videos);

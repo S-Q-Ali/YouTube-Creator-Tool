@@ -33,6 +33,12 @@ const TOOLS = [
     desc: "Connect your channel via OAuth for top search terms, traffic sources, retention, and best time to post.",
     cta: "Run an audit",
   },
+  {
+    href: "/production",
+    title: "Production Board",
+    desc: "Kanban board to manage your video pipeline from idea to published, with drag-and-drop status tracking.",
+    cta: "Open board",
+  },
 ];
 
 export default function Home() {

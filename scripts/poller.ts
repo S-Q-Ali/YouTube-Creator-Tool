@@ -31,8 +31,11 @@ async function tickTrending() {
 }
 
 console.log(`[poller] starting (interval ${Math.round(intervalMs / 1000)}s, trending every ${Math.round(trendingIntervalMs / 1000)}s)`);
-await tick();
-await tickTrending();
+
+(async () => {
+  await tick();
+  await tickTrending();
+})();
 
 const timer = setInterval(tick, intervalMs);
 const trendingTimer = setInterval(tickTrending, trendingIntervalMs);

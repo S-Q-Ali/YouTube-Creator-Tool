@@ -1,4 +1,4 @@
-import { config, requireApiKey } from "./config";
+import { config, requireApiKey, getApiKeys } from "./config";
 import { all, get, run } from "./db";
 import type { ChannelInfo, VideoInfo } from "./types";
 
@@ -30,15 +30,20 @@ export class RateLimitedError extends YoutubeApiError {
 const DATA_QUOTA_LIMIT = 10_000;
 const SEARCH_QUOTA_LIMIT = 100;
 
-function quotaKey(bucket: string): string {
+function quotaKey(bucket: string, keyIndex: number): string {
   const d = new Date();
   const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  return `quota:${bucket}:${ymd}`;
+  return `quota:${bucket}:key${keyIndex}:${ymd}`;
 }
 
 export function getQuotaUsage(bucket: "data" | "search"): { used: number; limit: number } {
-  const used = Number(get<{ value: string }>("SELECT value FROM settings WHERE key = $key", { key: quotaKey(bucket) })?.value ?? 0);
-  return { used, limit: bucket === "search" ? SEARCH_QUOTA_LIMIT : DATA_QUOTA_LIMIT };
+  // Sum usage across all keys for status display
+  const keys = getApiKeys();
+  let totalUsed = 0;
+  for (let i = 0; i < keys.length; i++) {
+    totalUsed += Number(get<{ value: string }>("SELECT value FROM settings WHERE key = $key", { key: quotaKey(bucket, i) })?.value ?? 0);
+  }
+  return { used: totalUsed, limit: bucket === "search" ? SEARCH_QUOTA_LIMIT * keys.length : DATA_QUOTA_LIMIT * keys.length };
 }
 
 export function getQuotaStatus() {
@@ -50,7 +55,7 @@ export function getQuotaStatus() {
   };
 }
 
-/** Daily usage for the last `days` days (per-UTC-day ledger entries). */
+/** Daily usage for the last `days` days (per-UTC-day ledger entries, summed across all keys). */
 export function getQuotaHistory(days = 7): { date: string; data: number; search: number }[] {
   const out: { date: string; data: number; search: number }[] = [];
   const keys = all<{ key: string; value: string }>(
@@ -58,12 +63,13 @@ export function getQuotaHistory(days = 7): { date: string; data: number; search:
   );
   const byDay = new Map<string, { data: number; search: number }>();
   for (const { key, value } of keys) {
-    const m = key.match(/^quota:(data|search):(\d{4}-\d{2}-\d{2})$/);
+    // Match both old format (quota:data:YYYY-MM-DD) and new per-key format (quota:data:keyN:YYYY-MM-DD)
+    const m = key.match(/^quota:(data|search):(?:key\d+:)?(\d{4}-\d{2}-\d{2})$/);
     if (!m) continue;
     const bucket = m[1] as "data" | "search";
     const ymd = m[2];
     const entry = byDay.get(ymd) ?? { data: 0, search: 0 };
-    entry[bucket] = Number(value);
+    entry[bucket] += Number(value);
     byDay.set(ymd, entry);
   }
   for (let i = days - 1; i >= 0; i--) {
@@ -74,8 +80,8 @@ export function getQuotaHistory(days = 7): { date: string; data: number; search:
   return out;
 }
 
-function recordQuota(bucket: "data" | "search", units: number) {
-  const key = quotaKey(bucket);
+function recordQuota(bucket: "data" | "search", units: number, keyIndex = 0) {
+  const key = quotaKey(bucket, keyIndex);
   const used = Number(get<{ value: string }>("SELECT value FROM settings WHERE key = $key", { key })?.value ?? 0);
   run(
     "INSERT INTO settings (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = $value",
@@ -83,41 +89,61 @@ function recordQuota(bucket: "data" | "search", units: number) {
   );
 }
 
+function getQuotaUsageForKey(bucket: "data" | "search", keyIndex: number): { used: number; limit: number } {
+  const used = Number(get<{ value: string }>("SELECT value FROM settings WHERE key = $key", { key: quotaKey(bucket, keyIndex) })?.value ?? 0);
+  return { used, limit: bucket === "search" ? SEARCH_QUOTA_LIMIT : DATA_QUOTA_LIMIT };
+}
+
 export async function ytFetch<T>(endpoint: string, params: Record<string, string>, bucket: "data" | "search", retries = 3): Promise<T> {
-  const key = requireApiKey();
-  const { used, limit } = getQuotaUsage(bucket);
-  if (used >= limit) throw new QuotaExceededError();
+  const apiKeys = getApiKeys();
+  const units = bucket === "search" ? 100 : 1;
 
-  const url = new URL(`${config.apiBaseUrl}/${endpoint}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  url.searchParams.set("key", key);
+  // Try each key until one works
+  for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
+    const key = apiKeys[keyIdx];
+    const { used, limit } = getQuotaUsageForKey(bucket, keyIdx);
+    if (used + units > limit) {
+      // This key is exhausted, try next
+      if (keyIdx < apiKeys.length - 1) continue;
+      throw new QuotaExceededError();
+    }
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
-      if (res.status === 429) {
-        const body429 = await res.json().catch(() => ({})) as { error?: { message?: string; errors?: { reason?: string }[] } };
-        const reason429 = body429.error?.errors?.[0]?.reason ?? body429.error?.message ?? "";
-        if (reason429.toLowerCase().includes("quota") || reason429.toLowerCase().includes("rate")) {
-          throw new QuotaExceededError();
+    const url = new URL(`${config.apiBaseUrl}/${endpoint}`);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    url.searchParams.set("key", key);
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
+        if (res.status === 429) {
+          const body429 = await res.json().catch(() => ({})) as { error?: { message?: string; errors?: { reason?: string }[] } };
+          const reason429 = body429.error?.errors?.[0]?.reason ?? body429.error?.message ?? "";
+          if (reason429.toLowerCase().includes("quota") || reason429.toLowerCase().includes("rate")) {
+            // This key is rate-limited/quota-exceeded, try next key
+            if (keyIdx < apiKeys.length - 1) break; // break inner loop, outer loop tries next key
+            throw new QuotaExceededError();
+          }
+          throw new RateLimitedError();
         }
-        throw new RateLimitedError();
+        const body = (await res.json()) as T & { error?: { code: number; message: string; errors?: { reason: string }[] } };
+        if (!res.ok) {
+          const reason = body.error?.errors?.[0]?.reason ?? body.error?.message ?? res.statusText;
+          if (reason === "quotaExceeded") {
+            if (keyIdx < apiKeys.length - 1) break; // try next key
+            throw new QuotaExceededError();
+          }
+          throw new YoutubeApiError(body.error?.message ?? "YouTube API request failed", reason, res.status);
+        }
+        recordQuota(bucket, units, keyIdx);
+        return body;
+      } catch (err) {
+        if (err instanceof QuotaExceededError || err instanceof RateLimitedError) throw err;
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+          continue;
+        }
+        throw err;
       }
-      const body = (await res.json()) as T & { error?: { code: number; message: string; errors?: { reason: string }[] } };
-      if (!res.ok) {
-        const reason = body.error?.errors?.[0]?.reason ?? body.error?.message ?? res.statusText;
-        if (reason === "quotaExceeded") throw new QuotaExceededError();
-        throw new YoutubeApiError(body.error?.message ?? "YouTube API request failed", reason, res.status);
-      }
-      recordQuota(bucket, bucket === "search" ? 100 : 1);
-      return body;
-    } catch (err) {
-      if (err instanceof QuotaExceededError || err instanceof RateLimitedError) throw err;
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
-        continue;
-      }
-      throw err;
     }
   }
   throw new YoutubeApiError("Unreachable");

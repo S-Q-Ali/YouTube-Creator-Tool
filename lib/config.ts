@@ -2,8 +2,16 @@ import path from "node:path";
 
 const cwd = process.cwd();
 
+// Support comma-separated multiple API keys
+const rawKeys = process.env.YOUTUBE_API_KEY ?? "";
+const apiKeys: string[] = rawKeys
+  .split(",")
+  .map((k) => k.trim())
+  .filter(Boolean);
+
 export const config = {
-  youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "",
+  youtubeApiKey: apiKeys[0] ?? "",
+  youtubeApiKeys: apiKeys,
   dataDir: process.env.DATABASE_DIR
     ? path.resolve(cwd, process.env.DATABASE_DIR)
     : path.join(cwd, "data"),
@@ -25,10 +33,14 @@ export const config = {
 };
 
 export function requireApiKey(): string {
-  if (!config.youtubeApiKey) {
+  if (apiKeys.length === 0) {
     throw new Error(
       "YOUTUBE_API_KEY is not set. Create a Google Cloud project, enable the YouTube Data API v3, and put the key in .env.local (see .env.example)."
     );
   }
-  return config.youtubeApiKey;
+  return apiKeys[0];
+}
+
+export function getApiKeys(): string[] {
+  return apiKeys;
 }
