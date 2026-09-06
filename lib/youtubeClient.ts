@@ -1,5 +1,6 @@
 import { config, requireApiKey, getApiKeys } from "./config";
 import { all, get, run } from "./db";
+import { searchWithYtdlp } from "./ytdlpSearch";
 import type { ChannelInfo, VideoInfo } from "./types";
 
 export class YoutubeApiError extends Error {
@@ -498,6 +499,24 @@ export async function searchVideos(q: string, opts: SearchOptions = {}): Promise
   quotaCost: number;
 }> {
   const maxResults = Math.min(opts.maxResults ?? 20, 50);
+
+  // Free search backend: use yt-dlp for plain relevance searches (the "rank this
+  // keyword against real search results" path) so the 100/day search.list quota
+  // stays unused. Only video IDs are needed here; view counts come from fetchVideos.
+  if (!opts.order && !opts.publishedAfter) {
+    const ytdlp = await searchWithYtdlp(q, maxResults);
+    if (ytdlp) {
+      const items = ytdlp.items.map((it) => ({
+        videoId: it.videoId,
+        title: it.title,
+        channelTitle: it.channelTitle ?? "",
+        publishedAt: it.publishedAt ?? "",
+        thumbnailUrl: it.thumbnailUrl ?? "",
+      }));
+      return { items, quotaCost: 0 };
+    }
+  }
+
   const params: Record<string, string> = {
     part: "snippet,statistics",
     type: "video",

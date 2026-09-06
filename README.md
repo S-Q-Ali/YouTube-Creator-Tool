@@ -27,12 +27,20 @@ npm.cmd run dev:full  # web server + background snapshot poller
 
 Then edit `.env.local` and add your keys (see below). Restart the dev server after changing it.
 
+`npm run setup` also checks for **yt-dlp** (free search backend): if it's on your `PATH` (or at
+`tools/yt-dlp.exe`) it's used automatically; otherwise setup downloads it on Windows. Keyword
+research + rankings then run without burning any `search.list` quota — the Data API is only used
+for view/subscriber counts (1 unit each).
+
 ## Credentials
 
-**YouTube Data API key** (needed for scorecards, rankings, lookups):
-1. [Google Cloud console](https://console.cloud.google.com) → create a project
-2. APIs & Services → Library → enable **YouTube Data API v3**
-3. Credentials → Create credentials → **API key** → paste into `YOUTUBE_API_KEY` in `.env.local`
+- **YouTube Data API key** (needed for scorecards, rankings, lookups):
+  1. [Google Cloud console](https://console.cloud.google.com) → create a project
+  2. APIs & Services → Library → enable **YouTube Data API v3**
+  3. Credentials → Create credentials → **API key** → paste into `YOUTUBE_API_KEY` in `.env.local`
+
+> **Zero-quota search:** when `yt-dlp` is available, keyword search and ranking never call the
+> Data API `search.list` — see the quick-start note above.
 
 **Google OAuth** (only for your own channel audit on `/audit`):
 1. Credentials → Create credentials → **OAuth client ID** → Web application
@@ -58,12 +66,15 @@ See `extension/README.md`.
 | `npm run test` | unit tests |
 | `npm run typecheck` | tsc --noEmit |
 | `npm run lint` | eslint |
+| `npm run backup` | export the whole DB to `./backups/niche-scope-<date>.json` |
+| `npm run restore-backup -- <file>` | restore a DB from a backup file (transactional) |
 
 ## Tech & notes
 
 - Next.js 16 (App Router, Turbopack), React 19, TypeScript strict, Tailwind v4
 - Node 24 built-in `node:sqlite` (no native deps, no ORM)
-- Free YouTube Data API (quota-ledgered) + keyless Google autocomplete
+- Free YouTube Data API (quota-ledgered) + keyless Google autocomplete + optional **yt-dlp** free search (no `search.list` quota)
+- Local backup/restore via `npm run backup` / `npm run restore-backup -- <file>`
 - Data lives in `./data/niche-scope.db` (git-ignored); API keys live in `.env.local` (git-ignored)
 
 See `SESSION.md` for architecture, the scoring formulas, and the roadmap.

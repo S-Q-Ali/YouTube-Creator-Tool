@@ -6,7 +6,7 @@ import {
   type ProductionStatus,
   STATUS_LABELS,
   STATUS_COLORS,
-} from "@/lib/productionBoard";
+} from "@/lib/productionTypes";
 
 const STATUSES: ProductionStatus[] = [
   "idea", "scripted", "recorded", "editing", "thumbnail", "seo", "scheduled", "published", "promoted",

@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { all } from "../lib/db";
+import { checkYtdlp, resolveYtdlpPath } from "../lib/ytdlpSearch";
 
 const root = path.resolve(__dirname, "..");
 const envLocal = path.join(root, ".env.local");
@@ -28,6 +29,40 @@ function readEnv(): Record<string, string> {
     if (m && m[1] !== "NEXT_PUBLIC_APP_URL") out[m[1]] = m[2];
   }
   return out;
+}
+
+async function ensureYtdlp(): Promise<boolean> {
+  const statusBefore = await checkYtdlp();
+  if (statusBefore.available) {
+    check("yt-dlp available", true, `${statusBefore.bin} (v${statusBefore.version})`);
+    return true;
+  }
+  check("yt-dlp available", false, statusBefore.error ?? "not found");
+
+  if (process.platform !== "win32") {
+    console.log("      Install yt-dlp (e.g. `pip install yt-dlp` or a package manager) and add it to PATH.");
+    console.log("      Keyword ranking will use the YouTube Data API search bucket until then.");
+    return false;
+  }
+
+  // Windows: fetch the single-file exe and drop it in tools/yt-dlp.exe.
+  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+  const toolsDir = path.join(root, "tools");
+  try {
+    fs.mkdirSync(toolsDir, { recursive: true });
+    console.log("  ↓ Downloading yt-dlp.exe from GitHub …");
+    const res = await fetch(url);
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    fs.writeFileSync(path.join(toolsDir, "yt-dlp.exe"), Buffer.from(await res.arrayBuffer()));
+    const after = await checkYtdlp();
+    if (!after.available || !after.version) throw new Error("downloaded binary did not run");
+    check("yt-dlp installed", true, `${resolveYtdlpPath()} (v${after.version})`);
+    return true;
+  } catch (err) {
+    check("yt-dlp installed", false, err instanceof Error ? err.message : "download failed");
+    console.log("      The app will fall back to the YouTube Data API. Re-run npm run setup later to retry.");
+    return false;
+  }
 }
 
 async function main() {
@@ -73,7 +108,10 @@ async function main() {
     console.log("      Only needed for the own-channel audit (/audit).");
   }
 
-  console.log("\n5. Database");
+  console.log("\n5. yt-dlp (free search backend)");
+  await ensureYtdlp();
+
+  console.log("\n6. Database");
   try {
     all("SELECT count(*) FROM settings");
     check("SQLite schema initialized", true, path.join(root, "data"));

@@ -249,3 +249,53 @@ All planned phases are complete. Future ideas (not yet planned):
   (keywords, tracked, quota, own-channel) on `/`. README rewritten (features, quick start, credentials,
   extension, scripts). **Production `npm run build` + `next start` verified** — all 23 routes compile,
   home/quota/apis 200. typecheck/lint clean, 20/20 tests.
+- **2026-09-04** (Session 10): trending engine upgrade — "new + rapidly growing" ranking boost applied
+  to ALL niches: `calculateViralScore` now takes `growthRate` + `newlyCreated` (+up to 25 pts:
+  growth/5 capped 20, +5 new), SQL ordering boosts `is_newly_created`(+5)/`is_rapidly_growing`(+10).
+  New helpers `isRapidlyGrowing` (threshold 50) + `detectAiGenerated` (keyword heuristic over
+  channel desc + video titles/tags, +30 faceless-niche bonus, >=70 = AI-generated). DB columns
+  `is_rapidly_growing`/`ai_score` (+ idempotent `migrateTrendingColumns`). API `/api/trending`
+  accepts `aiOnly=true`. UI: TrendingChannelCard badges (📈 Rapid, 🤖 AI), grid "🤖 AI Only" toggle.
+  Niches: longform `faceless` queries re-focused to fully-AI content; NEW shortform `faceless`
+  niche "AI-Generated Faceless Shorts" (easy). trendingEngine.test.ts (13 tests) — **33/33 pass**,
+  typecheck clean, lint output unchanged vs baseline. NOTE: `next build` fails on
+  /production/page with pre-existing Turbopack `node:sqlite` external-module error (also fails on
+  baseline commit; dev uses `--webpack` and works).
+- **2026-09-04** (Session 11): niche finding fixes — removed the "🤖 AI Only" toggle from
+  TrendingChannelsGrid (badges stay). **Fixed root bug**: `refreshAllTrending` treated
+  `format="all"/niche="all"` as a literal filter → UI Refresh with "All" selected scanned 0
+  niches (why user got no results). Now "all" = scan everything. **Fixed SEARCH_BUDGET check** in
+  `discoverTrendingChannels`: it compared aggregate daily quota `used` (100) vs budget (80) and
+  skipped ALL searches even with 100 remaining calls — now budgets the per-run `searchesUsed`.
+  Longform `faceless` queries re-focused to fully-AI content; NEW shortform `faceless` niche
+  "AI-Generated Faceless Shorts" (easy). Cleared stale `trending_channels` (14 old non-AI rows)
+  + `discovery_log` (one-off script, deleted after use). All other niches left untouched.
+  Live verify: refresh scans niches correctly; actual discovery blocked only by daily YouTube
+  search quota (200/200 used) — works after midnight-Pacific reset. trendingEngine.test.ts
+  (13 tests) — **33/33 pass**, typecheck clean, lint 17 problems (baseline 18).
+- **2026-09-06** (Session 8): local persistence layer. `lib/useLocalStorage.ts`
+  (`useLocalStorageState`/`useLocalStorageValue` via `useSyncExternalStore`, SSR-safe, `ns:` prefix),
+  `lib/mirror.ts` (bounded localStorage mirror `ns:mirror:*` — 256KB/entry, 1MB cap + eviction),
+  `lib/backup.ts` (`exportAll`/`importAll`, JSON v1, transactional wipe+restore, 50MB guard) +
+  `/api/backup` GET (download) / POST (restore) + `components/BackupPanel` + `scripts/backup.ts`
+  CLI (`npm run backup`, `npm run restore-backup -- <file>`), backup.test.ts (3 tests). State
+  persistence wired into KeywordResearch (`ns:kw:seed`/`ns:kw:lastResult`), ScorecardLookup
+  (`ns:score:mode`/`ns:score:input`), DashboardSnapshot (`mirror:dashboard`); extension prefs
+  (`ns:prefs`, `showCard`/`showPills`/`pillLimit`) via `chrome.storage.local` + popup checkboxes +
+  live `storage.onChanged` updates. **23/23 tests**, typecheck/lint clean. NOTE: the Phase 8/9
+  commits that followed reverted the *wiring* of this session — the standalone modules remain
+  (see Session 9 commit).
+- **2026-09-06** (Session 9): **zero-quota free search via yt-dlp** + production build fix.
+  `lib/ytdlpSearch.ts` (`parseYtdlpLines`, `resolveYtdlpPath` env→`tools/yt-dlp[.exe]`→PATH,
+  `checkYtdlp`, `searchWithYtdlp` via `ytsearchN:` `--flat-playlist --dump-json`, 45s timeout);
+  `searchVideos` tries yt-dlp first when no `order`/`publishedAfter` → `{items, quotaCost:0}`,
+  Data API fallback otherwise. `scripts/setup.ts` step 5 downloads `tools/yt-dlp.exe` on Windows
+  (git-ignored `/tools`) if not on PATH. ytdlpSearch.test.ts (4 tests). **Verified live on prod**:
+  research of "keto diet" ranked real results with **search bucket at 0/200** (only cheap
+  `videos.list`/channels fetches, data bucket +5). **Build fix**: `next build` (Turbopack) panicked
+  on `/production/page` (`node:sqlite` in browser chunk) — root cause was the Phase 9 **client**
+  `ProductionBoard` importing `STATUS_LABELS`/`STATUS_COLORS` from db-backed `lib/productionBoard.ts`.
+  Split pure types/constants into `lib/productionTypes.ts`; client imports from there, server lib
+  re-exports. Also removed the home page's server-side `getTrendingChannels` import (grid self-fetches
+  `/api/trending`) so `node:sqlite` stays server-side. **Prod build green**, 37/37 tests,
+  typecheck clean.

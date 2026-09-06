@@ -3,8 +3,8 @@ import { getQuotaStatus } from "@/lib/youtubeClient";
 import { isConnected } from "@/lib/oauth";
 import { listTracked } from "@/lib/tracking";
 import { getCachedKeywords } from "@/lib/keywordEngine";
-import { getTrendingChannels } from "@/lib/trendingEngine";
 import { TrendingChannelsGrid } from "@/components/TrendingChannelsGrid";
+import DashboardSnapshot from "@/components/DashboardSnapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,6 @@ export default function Home() {
   const connected = isConnected();
   const tracked = listTracked();
   const keywordCount = getCachedKeywords(undefined, 1).length;
-  const trendingChannels = getTrendingChannels("all", "all", 20, 0);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -84,8 +83,15 @@ export default function Home() {
       </div>
 
       <div className="mb-8">
-        <TrendingChannelsGrid initialChannels={trendingChannels} />
+        <TrendingChannelsGrid />
       </div>
+
+      <DashboardSnapshot
+        quotaUsed={quota.data.used}
+        quotaLimit={quota.data.limit}
+        tracked={tracked.length}
+        keywords={keywordCount}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         {TOOLS.map((t) => (

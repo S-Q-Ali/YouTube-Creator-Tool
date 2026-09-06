@@ -21,6 +21,7 @@ export const config = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ytdlpPath: process.env.YTDLP_PATH ?? "",
   autocompleteBaseUrl:
     "https://suggestqueries.google.com/complete/search",
   autocompleteTimeoutMs: 10_000,
