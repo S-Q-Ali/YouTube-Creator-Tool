@@ -9,10 +9,10 @@ export async function POST(req: NextRequest) {
     const niche = body.niche || undefined;
 
     const quota = getQuotaStatus();
-    if (quota.search.remaining <= 5) {
+    if (quota.data.remaining <= 0) {
       return NextResponse.json({
         success: false,
-        error: "Search quota exhausted. Resets at midnight Pacific Time.",
+        error: "Data API quota exhausted. Resets at midnight Pacific Time.",
         quota,
       }, { status: 429 });
     }
@@ -20,13 +20,13 @@ export async function POST(req: NextRequest) {
     let result;
     try {
       result = await refreshAllTrending(format, niche);
-    } catch (err: any) {
-      const msg = err?.message || String(err);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       const isQuota = msg.toLowerCase().includes("quota");
       const updatedQuota = getQuotaStatus();
       return NextResponse.json({
         success: false,
-        error: isQuota ? "Search quota exhausted. Resets at midnight Pacific Time." : msg,
+        error: isQuota ? "Daily API quota exhausted. Resets at midnight Pacific Time." : msg,
         quota: updatedQuota,
       }, { status: isQuota ? 429 : 500 });
     }

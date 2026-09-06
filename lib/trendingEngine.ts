@@ -1,7 +1,8 @@
 import { all, get, run } from "./db";
 import { fetchChannels, fetchVideos, ytFetch, QuotaExceededError, RateLimitedError } from "./youtubeClient";
+import { searchWithYtdlp } from "./ytdlpSearch";
 import type { ChannelInfo, VideoInfo } from "./types";
-import { VIDEO_FORMATS, FORMAT_NICHES, type Niche, type VideoFormat } from "./niches";
+import { VIDEO_FORMATS, FORMAT_NICHES } from "./niches";
 
 export { VIDEO_FORMATS, FORMAT_NICHES, type Niche, type VideoFormat } from "./niches";
 
@@ -203,10 +204,18 @@ function calculateGrowthRate(videos: VideoInfo[]): number {
   return Math.round(((recentAvg - olderAvg) / olderAvg) * 100);
 }
 
+/**
+ * Free yt-dlp search emits one child process per query, so discovery stays fast
+ * and gentle: cap how many queries run per niche, and honor a shared budget so a
+ * full refresh spreads its searches across many niches instead of exhausting one.
+ */
+export const MAX_QUERIES_PER_NICHE = 6;
+
 export async function discoverTrendingChannels(
   videoFormat: string,
   niche: string,
-  maxResults = 50
+  maxResults = 50,
+  sharedBudget?: { remaining: number }
 ): Promise<{ channels: TrendingChannel[]; searchesUsed: number }> {
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -222,34 +231,48 @@ export async function discoverTrendingChannels(
   const allChannels: TrendingChannel[] = [];
 
   let searchesUsed = 0;
-  const SEARCH_BUDGET = 80;
 
   for (const query of searchQueries) {
-    if (searchesUsed >= SEARCH_BUDGET) {
-      console.log(`Search budget exhausted (${searchesUsed}/${SEARCH_BUDGET}), stopping discovery for ${videoFormat}/${niche}`);
+    if (searchesUsed >= MAX_QUERIES_PER_NICHE) break;
+    if (sharedBudget && sharedBudget.remaining <= 0) {
+      console.log(`Shared search budget exhausted, stopping ${videoFormat}/${niche}`);
       break;
     }
 
     try {
-      const searchRes = await ytFetch<{ items?: Array<{ id?: { videoId?: string } }> }>(
-        "search",
-        {
-          part: "snippet",
-          type: "video",
-          q: query,
-          order: "viewCount",
-          publishedAfter,
-          maxResults: String(Math.min(maxResults, 50)),
-        },
-        "search"
-      );
+      // Free discovery backend: yt-dlp relevance search (no API key/quota) is the
+      // primary path; the Data API search.list fallback only fires when yt-dlp is
+      // unavailable or returns nothing. Ranking (viral score + rapid-growth/new
+      // channel bonuses) decides which discovered channels float to the top.
+      const ytdlp = await searchWithYtdlp(query, maxResults);
+      let videoIds: string[] = [];
+      if (ytdlp && ytdlp.items.length > 0) {
+        const formatMatches = (v: { durationSeconds?: number }) =>
+          v.durationSeconds == null ||
+          (videoFormat === "longform" ? v.durationSeconds >= 480 : v.durationSeconds <= 60);
+        videoIds = ytdlp.items.filter(formatMatches).map((it) => it.videoId).filter(Boolean);
+      }
+      if (videoIds.length === 0) {
+        const searchRes = await ytFetch<{ items?: Array<{ id?: { videoId?: string } }> }>(
+          "search",
+          {
+            part: "snippet",
+            type: "video",
+            q: query,
+            order: "viewCount",
+            publishedAfter,
+            maxResults: String(Math.min(maxResults, 50)),
+          },
+          "search"
+        );
+        videoIds = (searchRes.items ?? [])
+          .map((item) => item.id?.videoId)
+          .filter(Boolean) as string[];
+      }
       searchesUsed++;
+      if (sharedBudget) sharedBudget.remaining = Math.max(0, sharedBudget.remaining - 1);
 
-      const videoIds = (searchRes.items ?? [])
-        .map((item) => item.id?.videoId)
-        .filter(Boolean) as string[];
-
-        if (videoIds.length === 0) continue;
+      if (videoIds.length === 0) continue;
 
       const videos = await fetchVideos(videoIds);
 
@@ -545,18 +568,44 @@ export function getDiscoveryStatus(): { videoFormat: string; niche: string; last
   }));
 }
 
+/**
+ * Wall-clock budget for a full refresh: yt-dlp spawns are ~1-3s each, so several
+ * dozen searches across niches complete in well under a minute running in
+ * parallel. Discovered niches refresh again after 24h, so a budget keeps every
+ * refresh fast while still reaching many niches.
+ */
+export const TOTAL_SEARCH_BUDGET = 48;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+  );
+  return results;
+}
+
 export async function refreshAllTrending(
   videoFormat?: string,
   niche?: string
 ): Promise<{ discovered: number; niches: number; searchesUsed: number }> {
-  let totalDiscovered = 0;
-  let nichesScanned = 0;
-  let totalSearchesUsed = 0;
-
   const formatsToScan = videoFormat && videoFormat !== "all"
     ? VIDEO_FORMATS.filter(f => f.id === videoFormat)
     : VIDEO_FORMATS;
 
+  // Collect every (format, niche) pair up front so the concurrency pool can
+  // spread the shared search budget across niches instead of running one fully.
+  const targets: { formatId: string; nicheId: string }[] = [];
   for (const format of formatsToScan) {
     const nichesToScan = niche && niche !== "all"
       ? FORMAT_NICHES[format.id]?.filter(n => n.id === niche) || []
@@ -565,28 +614,46 @@ export async function refreshAllTrending(
     for (const n of nichesToScan) {
       if (wasNicheDiscoveredRecently(format.id, n.id)) {
         console.log(`Skipping ${format.name}/${n.name} - discovered recently (within 24h)`);
-        continue;
-      }
-
-      try {
-        const result = await discoverTrendingChannels(format.id, n.id, 50);
-        const channels = Array.isArray(result) ? result : result.channels;
-        const searchesUsed = Array.isArray(result) ? 0 : result.searchesUsed;
-        saveTrendingChannels(channels);
-        if (channels.length > 0) {
-          logDiscovery(format.id, n.id, channels.length, searchesUsed);
-        }
-        totalDiscovered += channels.length;
-        totalSearchesUsed += searchesUsed;
-        nichesScanned++;
-      } catch (err) {
-        if (err instanceof QuotaExceededError) {
-          console.log(`Quota exhausted, stopping all discovery`);
-          throw err;
-        }
-        console.error(`Failed to discover channels for ${format.name}/${n.name}:`, err);
+      } else {
+        targets.push({ formatId: format.id, nicheId: n.id });
       }
     }
+  }
+
+  const budget = { remaining: TOTAL_SEARCH_BUDGET };
+  let quotaHit = false;
+  let totalDiscovered = 0;
+  let nichesScanned = 0;
+  let totalSearchesUsed = 0;
+
+  await mapWithConcurrency(targets, 4, async ({ formatId, nicheId }) => {
+    const formatForLog = VIDEO_FORMATS.find(f => f.id === formatId);
+    const nicheData = FORMAT_NICHES[formatId]?.find(n => n.id === nicheId);
+    try {
+      const result = await discoverTrendingChannels(formatId, nicheId, 50, budget);
+      const channels = Array.isArray(result) ? result : result.channels;
+      const searchesUsed = Array.isArray(result) ? 0 : result.searchesUsed;
+      saveTrendingChannels(channels);
+      if (channels.length > 0) {
+        logDiscovery(formatId, nicheId, channels.length, searchesUsed);
+      }
+      totalDiscovered += channels.length;
+      totalSearchesUsed += searchesUsed;
+      nichesScanned++;
+    } catch (err) {
+      if (err instanceof QuotaExceededError) {
+        console.log(`Quota exhausted for ${formatId}/${nicheId}, stopping discovery`);
+        quotaHit = true;
+        throw err;
+      }
+      console.error(`Failed to discover channels for ${formatForLog?.name ?? formatId}/${nicheData?.name ?? nicheId}:`, err);
+    }
+  }).catch(() => {
+    // Swallow the stopping exception; the flag below still results in an error return.
+  });
+
+  if (quotaHit) {
+    throw new QuotaExceededError();
   }
 
   return { discovered: totalDiscovered, niches: nichesScanned, searchesUsed: totalSearchesUsed };
