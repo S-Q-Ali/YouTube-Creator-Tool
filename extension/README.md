@@ -11,6 +11,13 @@ youtube.com — powered by your local Niche-Scope server at `http://localhost:30
   score for each video.
 - **Popup**: server health, your API quota, tracked-item counts, and audit status.
 
+## Overlay preferences
+
+The popup has an **Overlay on YouTube** section: toggle the watch-page card and the
+thumbnail pills independently, and choose how many pills are added per DOM pass (12–60).
+Preferences persist in `chrome.storage.local` (key `ns:prefs`) and the content script
+applies them live via `chrome.storage.onChanged` — no page reload needed.
+
 ## Load it (unpacked)
 
 1. Make sure your Niche-Scope server is running: `npm run dev` in the project root.

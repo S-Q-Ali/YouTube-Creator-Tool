@@ -3,6 +3,7 @@
 import { useState } from "react";
 import TrackButton from "./TrackButton";
 import { ScoreBadge } from "./ScoreBadge";
+import { useLocalStorageState } from "@/lib/useLocalStorage";
 
 interface VideoResult {
   kind: "video";
@@ -100,8 +101,8 @@ function Stats({ label, value }: { label: string; value: string }) {
 }
 
 export default function ScorecardLookup() {
-  const [mode, setMode] = useState<"video" | "channel">("video");
-  const [input, setInput] = useState("");
+  const [mode, setMode] = useLocalStorageState<"video" | "channel">("score:mode", "video");
+  const [input, setInput] = useLocalStorageState<string>("score:input", "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VideoResult | ChannelResult | null>(null);

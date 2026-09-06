@@ -8,6 +8,35 @@ function api(path, opts) {
   });
 }
 
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24 };
+const PREFS_KEY = "ns:prefs";
+let prefs = { ...DEFAULT_PREFS };
+
+function ensurePrefs() {
+  chrome.runtime.sendMessage({ type: "prefs:get" }, (res) => {
+    if (res && res.ok && res.data) {
+      prefs = { ...DEFAULT_PREFS, ...res.data };
+      route();
+      scanThumbnails();
+    }
+  });
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes[PREFS_KEY]) return;
+  prefs = { ...DEFAULT_PREFS, ...(changes[PREFS_KEY].newValue || {}) };
+  if (!prefs.showCard && cardRoot) {
+    cardRoot.innerHTML =
+      '<div class="ns"><h1>Niche-Scope</h1><div class="ns-body"><p class="off">Overlay hidden in popup settings.</p></div></div>';
+  } else if (prefs.showCard && currentVideoId()) {
+    showWatchCard(currentVideoId());
+  }
+  if (prefs.showPills) {
+    badgedIds.clear();
+    scanThumbnails();
+  }
+});
+
 function videoIdFromHref(href) {
   try {
     const u = new URL(href, location.href);
@@ -155,6 +184,7 @@ function addPill(anchor, id) {
 
 function scanThumbnails() {
   if (overlayRunning) return;
+  if (!prefs.showPills) return;
   overlayRunning = true;
 
   const links = document.querySelectorAll(
@@ -162,7 +192,7 @@ function scanThumbnails() {
   );
   let added = 0;
   for (const a of links) {
-    if (added >= 24) break; // gentle on the local server per pass
+    if (added >= (prefs.pillLimit || 24)) break; // gentle on the local server per pass
     const id = videoIdFromHref(a.getAttribute("href"));
     if (!id || badgedIds.has(id)) continue;
     addPill(a, id);
@@ -179,7 +209,7 @@ function currentVideoId() {
 
 function route() {
   const id = currentVideoId();
-  if (id) {
+  if (id && prefs.showCard) {
     showWatchCard(id);
   }
 }
@@ -190,6 +220,7 @@ function onDomChange() {
 
 let observer = null;
 function init() {
+  ensurePrefs();
   route();
   scanThumbnails();
 
@@ -207,7 +238,7 @@ function watchUrl() {
   if (location.href !== lastHref) {
     lastHref = location.href;
     const id = currentVideoId();
-    if (id) {
+    if (id && prefs.showCard) {
       showWatchCard(id);
     }
     scanThumbnails();

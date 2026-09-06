@@ -26,6 +26,28 @@ async function get(path) {
   return res.ok ? res.json() : null;
 }
 
+/* ------------------------------ Overlay prefs ------------------------------ */
+
+async function loadPrefs() {
+  const res = await chrome.runtime.sendMessage({ type: "prefs:get" });
+  if (!res || !res.ok || !res.data) return;
+  const p = res.data;
+  document.getElementById("showCard").checked = !!p.showCard;
+  document.getElementById("showPills").checked = !!p.showPills;
+  document.getElementById("pillLimit").value = String(p.pillLimit || 24);
+}
+
+function savePrefs() {
+  chrome.runtime.sendMessage({
+    type: "prefs:set",
+    prefs: {
+      showCard: document.getElementById("showCard").checked,
+      showPills: document.getElementById("showPills").checked,
+      pillLimit: Number(document.getElementById("pillLimit").value) || 24,
+    },
+  });
+}
+
 async function main() {
   const quota = await get("/api/quota");
   const comp = await get("/api/competitors");
@@ -63,6 +85,11 @@ async function main() {
   rows.push("</div>");
   body.innerHTML = rows.join("");
 }
+
+document.getElementById("showCard").addEventListener("change", savePrefs);
+document.getElementById("showPills").addEventListener("change", savePrefs);
+document.getElementById("pillLimit").addEventListener("change", savePrefs);
+loadPrefs();
 
 main().catch(() => {
   setServer(false, "Server offline");

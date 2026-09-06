@@ -55,6 +55,8 @@
       .dot.on { background: #16a34a; }
       .dot.off { background: #dc2626; }
       .err { color: #b91c1c; font-size: 12px; line-height: 1.5; }
+      .opt { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 12px; }
+      .opt select { margin-left: auto; }
       footer { padding: 10px 14px 12px; border-top: 1px solid #f0f0f0; }
       footer a { color: #2563eb; text-decoration: none; font-size: 12px; }
       footer a:hover { text-decoration: underline; }
@@ -71,6 +73,20 @@
       <div class="status"><span class="dot" id="dot"></span><span id="serverText">Checking server…</span></div>
       <div id="body">
         <div class="card"><div class="label">Loading…</div></div>
+      </div>
+      <div class="card" id="prefsCard">
+        <div class="label">Overlay on YouTube</div>
+        <label class="opt"><input type="checkbox" id="showCard" /> Watch-page score card</label>
+        <label class="opt"><input type="checkbox" id="showPills" /> Thumbnail score pills</label>
+        <div class="opt">
+          <span>Pills per pass</span>
+          <select id="pillLimit">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="40">40</option>
+            <option value="60">60</option>
+          </select>
+        </div>
       </div>
     </main>
     <footer>

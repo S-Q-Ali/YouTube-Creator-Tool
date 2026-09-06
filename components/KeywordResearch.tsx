@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CompetitionBadge, ScoreBadge } from "./ScoreBadge";
+import { useLocalStorageState } from "@/lib/useLocalStorage";
+import { writeMirror } from "@/lib/mirror";
 
 interface KeywordResult {
   term: string;
@@ -26,10 +28,10 @@ interface ResearchOutput {
 }
 
 export default function KeywordResearch() {
-  const [seed, setSeed] = useState("");
+  const [seed, setSeed] = useLocalStorageState<string>("kw:seed", "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ResearchOutput | null>(null);
+  const [data, setData] = useLocalStorageState<ResearchOutput | null>("kw:lastResult", null);
 
   async function run(e?: React.FormEvent) {
     e?.preventDefault();
@@ -46,6 +48,7 @@ export default function KeywordResearch() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Research failed");
       setData(json);
+      writeMirror("kw:last", json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Research failed");
     } finally {

@@ -11,7 +11,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backup": "node scripts/backup.ts backup",
+    "restore-backup": "node scripts/backup.ts restore"
   },
   "dependencies": {
     "next": "16.3.0",

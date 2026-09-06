@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ConnectCard from "@/components/ConnectCard";
+import BackupPanel from "@/components/BackupPanel";
 import { isConnected, oauthEnabled } from "@/lib/oauth";
 import { config } from "@/lib/config";
 import { getQuotaStatus } from "@/lib/youtubeClient";
@@ -69,6 +70,8 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
             <li><span className="text-zinc-500">OAuth configured:</span> {configured ? "yes" : "no"}</li>
           </ul>
         </div>
+
+        <BackupPanel />
       </div>
     </div>
   );
