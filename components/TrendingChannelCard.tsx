@@ -13,6 +13,8 @@ interface TrendingChannelCardProps {
     viralScore: number;
     growthRate: number;
     isNewlyCreated: boolean;
+    isRapidlyGrowing?: boolean;
+    aiScore?: number;
     categoryName: string;
     viewSubRatio: number;
     niche?: string;
@@ -120,6 +122,16 @@ export function TrendingChannelCard({ channel, nicheRpm, onAnalyze }: TrendingCh
         {channel.isNewlyCreated && (
           <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
             New
+          </span>
+        )}
+        {channel.isRapidlyGrowing && (
+          <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+            📈 Rapid
+          </span>
+        )}
+        {typeof channel.aiScore === "number" && channel.aiScore >= 70 && (
+          <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+            🤖 AI
           </span>
         )}
       </div>
