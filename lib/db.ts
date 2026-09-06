@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS trending_channels (
   recent_video_count INTEGER NOT NULL DEFAULT 0,
   avg_views_per_video REAL NOT NULL DEFAULT 0,
   is_newly_created INTEGER NOT NULL DEFAULT 0,
+  is_rapidly_growing INTEGER NOT NULL DEFAULT 0,
+  ai_score INTEGER NOT NULL DEFAULT 0,
   last_analyzed INTEGER NOT NULL DEFAULT 0
 );
 
@@ -270,6 +272,28 @@ function migrateNicheIds(d: DatabaseSync) {
   console.log("Niche migration complete.");
 }
 
+// Add trending channel columns for rapid-growth flag + AI-content score.
+function migrateTrendingColumns(d: DatabaseSync) {
+  const columns: { name: string; ddl: string }[] = [
+    {
+      name: "is_rapidly_growing",
+      ddl: "ALTER TABLE trending_channels ADD COLUMN is_rapidly_growing INTEGER NOT NULL DEFAULT 0",
+    },
+    {
+      name: "ai_score",
+      ddl: "ALTER TABLE trending_channels ADD COLUMN ai_score INTEGER NOT NULL DEFAULT 0",
+    },
+  ];
+  for (const col of columns) {
+    try {
+      d.exec(col.ddl);
+      console.log(`Added trending_channels.${col.name} column.`);
+    } catch {
+      // Column already exists — nothing to do.
+    }
+  }
+}
+
 function open(): DatabaseSync {
   if (db) return db;
   fs.mkdirSync(config.dataDir, { recursive: true });
@@ -278,6 +302,7 @@ function open(): DatabaseSync {
   db.exec("PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
   migrateNicheIds(db);
+  migrateTrendingColumns(db);
   return db;
 }
 
