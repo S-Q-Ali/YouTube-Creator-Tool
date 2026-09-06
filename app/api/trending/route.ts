@@ -6,12 +6,13 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const format = searchParams.get("format") || "all";
   const niche = searchParams.get("niche") || "all";
+  const aiOnly = searchParams.get("aiOnly") === "true";
   const page = Math.max(1, Number(searchParams.get("page") || "1"));
   const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") || "20")));
   const offset = (page - 1) * limit;
 
-  const channels = getTrendingChannels(format, niche, limit, offset);
-  const total = getTrendingChannelCount(format, niche);
+  const channels = getTrendingChannels(format, niche, limit, offset, aiOnly);
+  const total = getTrendingChannelCount(format, niche, aiOnly);
   const quota = getQuotaStatus();
   const discoveryStatus = getDiscoveryStatus();
 
