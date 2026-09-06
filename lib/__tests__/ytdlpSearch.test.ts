@@ -42,4 +42,27 @@ describe("parseYtdlpLines", () => {
     expect(items).toHaveLength(2);
     expect(items.map((i) => i.videoId)).toEqual(["x1", "x2"]);
   });
+
+  it("captures channelId and durationSeconds for discovery", () => {
+    const stdout = JSON.stringify({
+      id: "vid01",
+      title: "AI history documentary",
+      channel: "NARD Archives",
+      channel_id: "UCXzq1P5NVX5ZBQX3OgmqEHw",
+      duration: 2494,
+    });
+    const items = parseYtdlpLines(stdout);
+    expect(items[0]).toMatchObject({
+      videoId: "vid01",
+      title: "AI history documentary",
+      channelTitle: "NARD Archives",
+      channelId: "UCXzq1P5NVX5ZBQX3OgmqEHw",
+      durationSeconds: 2494,
+    });
+  });
+
+  it("omits optional discovery fields when absent", () => {
+    const items = parseYtdlpLines(JSON.stringify({ id: "v2", title: "T" }));
+    expect(items[0]).toEqual({ videoId: "v2", title: "T" });
+  });
 });

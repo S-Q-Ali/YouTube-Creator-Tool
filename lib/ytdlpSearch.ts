@@ -9,6 +9,8 @@ export interface YtdlpItem {
   channelTitle?: string;
   publishedAt?: string;
   thumbnailUrl?: string;
+  channelId?: string;
+  durationSeconds?: number;
 }
 
 export interface YtdlpSearchResult {
@@ -39,6 +41,8 @@ export function parseYtdlpLines(stdout: string): YtdlpItem[] {
       channelTitle: typeof entry.channel === "string" ? entry.channel : undefined,
       publishedAt: typeof entry.upload_date === "string" ? entry.upload_date : undefined,
       thumbnailUrl: typeof entry.thumbnail === "string" ? entry.thumbnail : undefined,
+      channelId: typeof entry.channel_id === "string" ? entry.channel_id : undefined,
+      durationSeconds: typeof entry.duration === "number" ? entry.duration : undefined,
     });
   }
   return items;
