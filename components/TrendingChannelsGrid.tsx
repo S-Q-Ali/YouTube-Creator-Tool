@@ -17,6 +17,8 @@ interface TrendingChannel {
   viralScore: number;
   growthRate: number;
   isNewlyCreated: boolean;
+  isRapidlyGrowing?: boolean;
+  aiScore?: number;
   categoryName: string;
   viewSubRatio: number;
   videoFormat: string;
@@ -158,7 +160,7 @@ export function TrendingChannelsGrid({
             Trending Channels
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {total} channels discovered • Top 20 by viral score
+            {total} channels discovered • Newly created + rapidly growing channels rank first in every niche
           </p>
         </div>
 
