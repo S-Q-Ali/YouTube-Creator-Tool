@@ -299,3 +299,15 @@ All planned phases are complete. Future ideas (not yet planned):
   re-exports. Also removed the home page's server-side `getTrendingChannels` import (grid self-fetches
   `/api/trending`) so `node:sqlite` stays server-side. **Prod build green**, 37/37 tests,
   typecheck clean.
+- **2026-09-06** (Session 10): **zero-quota trending discovery via yt-dlp**. Trend "Refresh" was the
+  last remaining `search.list` consumer (`discoverTrendingChannels` called `ytFetch("search")` directly
+  at 100 units/call — one refresh burned the whole 200/200 search bucket). Now primary path is
+  `searchWithYtdlp(query)`; `parseYtdlpLines` also captures `channel_id`→`channelId` and
+  `duration`→`durationSeconds` so the longform/shortform duration filter runs before `fetchVideos`.
+  Data API `search.list` fallback only when yt-dlp unavailable/empty. `/api/trending/refresh` guard
+  switched from search-quota to data-quota (search is no longer touched). Speed: added shared budget
+  (`TOTAL_SEARCH_BUDGET=48`) + `MAX_QUERIES_PER_NICHE=6` + 4-way concurrent niche scanning
+  (`mapWithConcurrency`). **Verified live on prod**: `POST /api/trending/refresh` → success in 112s,
+  260 channels across every niche, **search bucket unchanged at 200/200**; top results carry
+  `isRapidlyGrowing`/`aiScore`. Lint: cleared `no-explicit-any` in refresh route + unused type imports
+  in trendingEngine. **39/39 tests**, typecheck clean, prod build green.
