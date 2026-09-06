@@ -32,6 +32,19 @@ Then edit `.env.local` and add your keys (see below). Restart the dev server aft
 research + rankings then run without burning any `search.list` quota — the Data API is only used
 for view/subscriber counts (1 unit each).
 
+## One-click start (Windows)
+
+Double-click **`Start Niche-Scope.bat`** (repo root) or the **Niche-Scope** shortcut on your
+Desktop (created on first run). It verifies Node/deps, runs `setup` (DB init + yt-dlp download
+on first run), starts the web server + background poller, and opens the browser automatically.
+
+```
+Start Niche-Scope.bat          # full: server + poller + auto-open browser
+  -ServerOnly                  # server only, no background poller
+  -CheckOnly                   # verify environment, then exit (no server)
+  -NoShortcut                  # skip creating the Desktop shortcut
+```
+
 ## Credentials
 
 - **YouTube Data API key** (needed for scorecards, rankings, lookups):
