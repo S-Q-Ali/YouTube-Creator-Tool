@@ -217,10 +217,6 @@ export async function discoverTrendingChannels(
   maxResults = 50,
   sharedBudget?: { remaining: number }
 ): Promise<{ channels: TrendingChannel[]; searchesUsed: number }> {
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const publishedAfter = oneWeekAgo.toISOString();
-
   const nicheData = FORMAT_NICHES[videoFormat]?.find(n => n.id === niche);
   if (!nicheData) {
     console.error(`Niche ${niche} not found for format ${videoFormat}`);
@@ -240,10 +236,13 @@ export async function discoverTrendingChannels(
     }
 
     try {
-      // Free discovery backend: yt-dlp relevance search (no API key/quota) is the
-      // primary path; the Data API search.list fallback only fires when yt-dlp is
-      // unavailable or returns nothing. Ranking (viral score + rapid-growth/new
-      // channel bonuses) decides which discovered channels float to the top.
+      // Free discovery backend (yt-dlp only, zero API quota): search QUERY via
+      // ytsearchN:. Shortform queries carry a "#shorts" tag to bias results toward
+      // real Shorts. There is deliberately NO Data API search.list fallback here —
+      // that endpoint costs 100 quota units per call and was exhausting the daily
+      // search budget; if yt-dlp yields nothing, discovery simply skips the query.
+      // Ranking (viral score + rapid-growth/new channel bonuses) plus the runtime
+      // duration filter decide which discovered channels float to the top.
       const ytdlp = await searchWithYtdlp(query, maxResults);
       let videoIds: string[] = [];
       if (ytdlp && ytdlp.items.length > 0) {
@@ -251,23 +250,6 @@ export async function discoverTrendingChannels(
           v.durationSeconds == null ||
           (videoFormat === "longform" ? v.durationSeconds >= 480 : v.durationSeconds <= 60);
         videoIds = ytdlp.items.filter(formatMatches).map((it) => it.videoId).filter(Boolean);
-      }
-      if (videoIds.length === 0) {
-        const searchRes = await ytFetch<{ items?: Array<{ id?: { videoId?: string } }> }>(
-          "search",
-          {
-            part: "snippet",
-            type: "video",
-            q: query,
-            order: "viewCount",
-            publishedAfter,
-            maxResults: String(Math.min(maxResults, 50)),
-          },
-          "search"
-        );
-        videoIds = (searchRes.items ?? [])
-          .map((item) => item.id?.videoId)
-          .filter(Boolean) as string[];
       }
       searchesUsed++;
       if (sharedBudget) sharedBudget.remaining = Math.max(0, sharedBudget.remaining - 1);
