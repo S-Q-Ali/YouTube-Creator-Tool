@@ -155,4 +155,23 @@ describe("niches", () => {
     expect(shortform?.difficulty).toBe("easy");
     expect(shortform?.queries.every((q) => q.toLowerCase().includes("ai"))).toBe(true);
   });
+
+  it("has a Kids Content niche for both 16:9 and 9:16 formats with child-safe queries", () => {
+    const longform = engine.FORMAT_NICHES.longform?.find((n) => n.id === "kids");
+    const shortform = engine.FORMAT_NICHES.shortform?.find((n) => n.id === "kids");
+
+    expect(longform).toBeDefined();
+    expect(longform?.name).toBe("Kids Content");
+    expect(longform?.difficulty).toBe("easy");
+    expect(longform?.queries.some((q) => q.toLowerCase().includes("kids"))).toBe(true);
+
+    expect(shortform).toBeDefined();
+    expect(shortform?.name).toBe("Kids Shorts");
+    expect(shortform?.difficulty).toBe("easy");
+    expect(shortform?.queries.some((q) => q.toLowerCase().includes("kids"))).toBe(true);
+
+    const childSafe = /violence|blood|nsfw|adult|sexy/i;
+    const allKidsQueries = [...(longform?.queries ?? []), ...(shortform?.queries ?? [])];
+    expect(allKidsQueries.some((q) => childSafe.test(q))).toBe(false);
+  });
 });
