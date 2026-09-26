@@ -7,6 +7,7 @@
     "dev": "next dev --webpack",
     "dev:full": "concurrently -n web,poller -c cyan,magenta \"next dev --webpack\" \"tsx scripts/poller.ts\"",
     "poller": "tsx scripts/poller.ts",
+    "replicate": "tsx scripts/replicate.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

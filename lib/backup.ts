@@ -10,6 +10,7 @@ export const BACKUP_TABLES = [
   "video_snapshots",
   "tracked_items",
   "rankings",
+  "replication_runs",
 ] as const;
 
 export interface BackupFile {

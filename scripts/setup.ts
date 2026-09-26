@@ -10,6 +10,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { all } from "../lib/db";
 import { checkYtdlp, resolveYtdlpPath } from "../lib/ytdlpSearch";
+import { checkFfmpeg, checkFfprobe, resolveFfmpegPath } from "../lib/ffmpeg";
 
 const root = path.resolve(__dirname, "..");
 const envLocal = path.join(root, ".env.local");
@@ -65,6 +66,75 @@ async function ensureYtdlp(): Promise<boolean> {
   }
 }
 
+async function ensureFfmpeg(): Promise<boolean> {
+  const before = await checkFfmpeg();
+  if (before.available) {
+    check("ffmpeg available", true, `${before.bin}${before.version ? " (" + before.version + ")" : ""}`);
+    const probe = await checkFfprobe();
+    check("ffprobe available", probe.available, probe.error ?? "");
+    return probe.available;
+  }
+  check("ffmpeg available", false, before.error ?? "not found");
+
+  if (process.platform !== "win32") {
+    console.log("      Install ffmpeg (e.g. `choco install ffmpeg` or `apt install ffmpeg`) and set FFMPEG_PATH / FFPROBE_PATH.");
+    return false;
+  }
+
+  // Windows: fetch the BtbN full static build (zip) and copy ffmpeg.exe + ffprobe.exe into tools/ffmpeg/.
+  const url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+  const zipPath = path.join(root, "tools", "ffmpeg-build.zip");
+  const extractDir = path.join(root, "tools", "ffmpeg-extract");
+  const ffmpegDir = path.join(root, "tools", "ffmpeg");
+  try {
+    fs.mkdirSync(ffmpegDir, { recursive: true });
+    fs.mkdirSync(extractDir, { recursive: true });
+    console.log("  ↓ Downloading ffmpeg (BtbN win64 build) …");
+    const res = await fetch(url);
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    fs.writeFileSync(zipPath, Buffer.from(await res.arrayBuffer()));
+
+    console.log("  ↓ Extracting (powershell Expand-Archive) …");
+    execSync(
+      `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${extractDir}' -Force"`,
+      { stdio: "pipe" }
+    );
+
+    const exes = collectExes(extractDir);
+    if (!exes.ffmpeg || !exes.ffprobe) throw new Error(`binaries missing after extraction (ffmpeg=${!!exes.ffmpeg}, ffprobe=${!!exes.ffprobe})`);
+    fs.copyFileSync(exes.ffmpeg, path.join(ffmpegDir, "ffmpeg.exe"));
+    fs.copyFileSync(exes.ffprobe, path.join(ffmpegDir, "ffprobe.exe"));
+
+    fs.rmSync(extractDir, { recursive: true, force: true });
+    fs.rmSync(zipPath, { force: true });
+
+    const after = await checkFfmpeg();
+    const probe = await checkFfprobe();
+    if (!after.available || !after.version) throw new Error("downloaded ffmpeg did not run");
+    if (!probe.available) throw new Error("downloaded ffprobe did not run");
+    check("ffmpeg installed", true, `${resolveFfmpegPath()} (${after.version})`);
+    return true;
+  } catch (err) {
+    check("ffmpeg installed", false, err instanceof Error ? err.message : "download failed");
+    console.log("      The replication pipeline will report a missing-render step. Re-run npm run setup later to retry.");
+    return false;
+  }
+}
+
+function collectExes(dir: string): { ffmpeg: string | null; ffprobe: string | null } {
+  const out = { ffmpeg: null as string | null, ffprobe: null as string | null };
+  const walk = (d: string) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (entry.name.toLowerCase() === "ffmpeg.exe" && !out.ffmpeg) out.ffmpeg = p;
+      else if (entry.name.toLowerCase() === "ffprobe.exe" && !out.ffprobe) out.ffprobe = p;
+    }
+  };
+  walk(dir);
+  return out;
+}
+
 async function main() {
   console.log("Niche-Scope setup\n");
 
@@ -111,7 +181,10 @@ async function main() {
   console.log("\n5. yt-dlp (free search backend)");
   await ensureYtdlp();
 
-  console.log("\n6. Database");
+  console.log("\n6. ffmpeg (video replication renderer)");
+  await ensureFfmpeg();
+
+  console.log("\n7. Database");
   try {
     all("SELECT count(*) FROM settings");
     check("SQLite schema initialized", true, path.join(root, "data"));

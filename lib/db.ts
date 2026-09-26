@@ -214,6 +214,31 @@ CREATE TABLE IF NOT EXISTS production_board (
 );
 CREATE INDEX IF NOT EXISTS idx_production_status ON production_board(status);
 CREATE INDEX IF NOT EXISTS idx_production_priority ON production_board(priority);
+
+CREATE TABLE IF NOT EXISTS replication_runs (
+  id TEXT PRIMARY KEY,
+  channel_id TEXT NOT NULL DEFAULT '',
+  channel_title TEXT NOT NULL DEFAULT '',
+  script_id INTEGER,
+  script_title TEXT NOT NULL DEFAULT '',
+  niche TEXT NOT NULL DEFAULT '',
+  video_format TEXT NOT NULL DEFAULT 'longform',
+  voice TEXT NOT NULL DEFAULT '',
+  run_title TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'planning',
+  stage TEXT NOT NULL DEFAULT 'planning',
+  scenes_json TEXT NOT NULL DEFAULT '[]',
+  progress_json TEXT NOT NULL DEFAULT '{}',
+  render_path TEXT NOT NULL DEFAULT '',
+  thumbnail_path TEXT NOT NULL DEFAULT '',
+  board_item_id TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_replication_status ON replication_runs(status);
+CREATE INDEX IF NOT EXISTS idx_replication_channel ON replication_runs(channel_id);
+CREATE INDEX IF NOT EXISTS idx_replication_created ON replication_runs(created_at DESC);
 `;
 
 // Niche ID migration: old → new

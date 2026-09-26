@@ -22,6 +22,20 @@ export const config = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   appBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ytdlpPath: process.env.YTDLP_PATH ?? "",
+  mediaDir: process.env.MEDIA_DIR
+    ? path.resolve(cwd, process.env.MEDIA_DIR)
+    : path.join(cwd, "data", "media"),
+  rendersDir: process.env.RENDERS_DIR
+    ? path.resolve(cwd, process.env.RENDERS_DIR)
+    : path.join(cwd, "data", "renders"),
+  toolsDir: path.join(cwd, "tools"),
+  ffmpegDir: path.join(cwd, "tools", "ffmpeg"),
+  ffmpegPath: process.env.FFMPEG_PATH ?? "",
+  ffprobePath: process.env.FFPROBE_PATH ?? "",
+  voiceStudioBaseUrl: process.env.VOICESTUDIO_URL ?? "http://127.0.0.1:3900",
+  pixabayApiKey: process.env.PIXABAY_API_KEY ?? "",
+  pexelsApiKey: process.env.PEXELS_API_KEY ?? "",
+  openverseBaseUrl: process.env.OPENVERSE_BASE_URL ?? "https://api.openverse.org/v1",
   autocompleteBaseUrl:
     "https://suggestqueries.google.com/complete/search",
   autocompleteTimeoutMs: 10_000,
