@@ -63,6 +63,8 @@ export async function GET(
             viewSubRatio: trending.viewSubRatio,
             isNewlyCreated: trending.isNewlyCreated,
             categoryName: trending.categoryName,
+            videoFormat: trending.videoFormat,
+            niche: trending.niche,
           }
         : null,
       analyzed,

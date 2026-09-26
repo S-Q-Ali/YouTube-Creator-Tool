@@ -23,6 +23,8 @@ interface ChannelData {
     viewSubRatio: number;
     isNewlyCreated: boolean;
     categoryName: string;
+    videoFormat?: string;
+    niche?: string;
   } | null;
   analyzed: boolean;
   analysis: {
@@ -42,6 +44,7 @@ interface ChannelData {
       difficulty: string;
     }>;
     scripts: Array<{
+      id?: number;
       title: string;
       hook: string;
       intro: string;
@@ -85,11 +88,9 @@ export default function SimilarChannelPage({
   const [data, setData] = useState<ChannelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [replicatingId, setReplicatingId] = useState<number | null>(null);
+  const [replicaError, setReplicaError] = useState("");
   const [activeTab, setActiveTab] = useState<"strategy" | "ideas" | "scripts" | "blueprint">("strategy");
-
-  useEffect(() => {
-    fetchChannelData();
-  }, [channelId]);
 
   const fetchChannelData = async () => {
     setLoading(true);
@@ -103,6 +104,25 @@ export default function SimilarChannelPage({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/similar/${channelId}`);
+        const result = await res.json();
+        if (mounted) setData(result);
+      } catch (error) {
+        console.error("Failed to fetch channel:", error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, [channelId]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -120,6 +140,48 @@ export default function SimilarChannelPage({
       console.error("Analysis failed:", error);
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleReplicate = async (script: {
+    id?: number;
+    title: string;
+    hook: string;
+    intro: string;
+    bodySections: string[];
+    outro: string;
+    estimatedDuration: number;
+  }) => {
+    if (!script.id) {
+      setReplicaError("Script has no stored id — re-run analysis first.");
+      return;
+    }
+    setReplicatingId(script.id);
+    setReplicaError("");
+    try {
+      const res = await fetch("/api/replicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channelId,
+          channelTitle: channel?.title ?? "",
+          scriptId: script.id,
+          niche: trending?.niche ?? "",
+          videoFormat: trending?.videoFormat ?? "longform",
+          voice: "",
+          runTitle: script.title,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Failed to start replication");
+      }
+      router.push(`/studio?run=${result.run.id}`);
+    } catch (error) {
+      console.error("Replication failed:", error);
+      setReplicaError(error instanceof Error ? error.message : "Failed to start replication");
+    } finally {
+      setReplicatingId(null);
     }
   };
 
@@ -339,13 +401,27 @@ export default function SimilarChannelPage({
 
           {activeTab === "scripts" && (
             <div className="space-y-6">
+              {replicaError && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400">
+                  {replicaError}
+                </p>
+              )}
               {analysis?.scripts?.map((script, i) => (
                 <div key={i} className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <h4 className="font-semibold text-zinc-900 dark:text-white">{script.title}</h4>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                      {Math.floor(script.estimatedDuration / 60)}:{String(script.estimatedDuration % 60).padStart(2, "0")}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+                        {Math.floor(script.estimatedDuration / 60)}:{String(script.estimatedDuration % 60).padStart(2, "0")}
+                      </span>
+                      <button
+                        onClick={() => handleReplicate(script)}
+                        disabled={replicatingId !== null || !script.id}
+                        className="rounded-lg bg-gradient-to-r from-red-600 to-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                      >
+                        {replicatingId === script.id ? "Starting…" : "Replicate ⚡"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-4 space-y-4">

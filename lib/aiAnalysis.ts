@@ -426,6 +426,7 @@ export function getAnalysis(channelId: string): {
   }));
 
   const scripts = all<{
+    id: number;
     script_title: string;
     hook: string;
     intro: string;
@@ -433,6 +434,7 @@ export function getAnalysis(channelId: string): {
     outro: string;
     estimated_duration: number;
   }>("SELECT * FROM channel_scripts WHERE channel_id = $id", { id: channelId }).map((r) => ({
+    id: r.id,
     title: r.script_title,
     hook: r.hook,
     intro: r.intro,
