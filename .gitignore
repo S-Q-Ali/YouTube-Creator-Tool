@@ -30,8 +30,11 @@
 # local backups
 /backups
 
-# local binaries (yt-dlp.exe downloaded by npm run setup)
+# local binaries (yt-dlp.exe + ffmpeg.exe downloaded by npm run setup)
 /tools
+
+# opencode relocated data (project-local, was ~/.local/share/opencode)
+/.opencode-data
 
 # debug
 npm-debug.log*
