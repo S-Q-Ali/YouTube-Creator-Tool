@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Niche-Scope · Local-First Stack",
+    "output": "niche-scope-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/S-Q-Ali/YouTube-Creator-Tool.git",
+      "revision": "2e965b327dee002c1c1c545708adad15e33a9196"
+    },
+    "viewBox": [944, 548],
+    "views": [
+      {
+        "id": "primary-path",
+        "label": "Primary path",
+        "focus": ["browser", "web", "api", "replicate", "db"],
+        "note": "Creator blasts a video: Web UI → Route Handlers → Replication pipeline → SQLite."
+      },
+      {
+        "id": "analysis",
+        "label": "Analysis path",
+        "focus": ["api", "yt", "ai"],
+        "note": "YouTube lookups + free-LLM analysis produce ideas and scripts saved to SQLite."
+      },
+      {
+        "id": "replication",
+        "label": "Replication duties",
+        "focus": ["replicate", "voice", "media", "tools"],
+        "note": "Per-scene narration, media assets, ffmpeg rendering and board items."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Creator",
+      "sublabel": "Browser (single user)",
+      "pos": [16, 300],
+      "size": [130, 80]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web UI",
+      "sublabel": "Next.js App Router",
+      "pos": [226, 300],
+      "size": [150, 80],
+      "sources": [
+        { "path": "app/page.tsx", "line": 1 },
+        { "path": "app/similar/[channelId]/page.tsx", "line": 1 }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Route Handlers",
+      "sublabel": "app/api + lib/*",
+      "pos": [456, 300],
+      "size": [150, 80],
+      "sources": [
+        { "path": "app/api/similar/[channelId]/route.ts", "line": 1 },
+        { "path": "lib/aiAnalysis.ts", "line": 55 }
+      ]
+    },
+    {
+      "id": "replicate",
+      "type": "backend",
+      "label": "Replication pipeline",
+      "sublabel": "voice → media → render → board",
+      "pos": [706, 300],
+      "size": [180, 80]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "niche-scope.db · node:sqlite",
+      "pos": [415, 445],
+      "size": [150, 80],
+      "sources": [{ "path": "lib/db.ts", "line": 1 }]
+    },
+    {
+      "id": "media",
+      "type": "backend",
+      "label": "Media resolver",
+      "sublabel": "Openverse · Pixabay · Pexels · library",
+      "pos": [200, 445],
+      "size": [180, 80]
+    },
+    {
+      "id": "yt",
+      "type": "external",
+      "label": "YouTube APIs",
+      "sublabel": "Data v3 + Analytics (OAuth)",
+      "pos": [30, 140],
+      "size": [150, 80],
+      "sources": [{ "path": "lib/config.ts", "line": 42 }]
+    },
+    {
+      "id": "ai",
+      "type": "external",
+      "label": "AI Gateways",
+      "sublabel": "Groq · AiHubMix · OpenRouter · Gemini",
+      "pos": [30, 30],
+      "size": [150, 80],
+      "sources": [{ "path": "lib/aiAnalysis.ts", "line": 90 }]
+    },
+    {
+      "id": "voice",
+      "type": "external",
+      "label": "Voice Studio",
+      "sublabel": "Local TTS port 3900 · SAPI fallback",
+      "pos": [600, 445],
+      "size": [160, 80]
+    },
+    {
+      "id": "tools",
+      "type": "external",
+      "label": "Local binaries",
+      "sublabel": "ffmpeg · ffprobe · yt-dlp",
+      "pos": [770, 445],
+      "size": [150, 80],
+      "sources": [{ "path": "scripts/setup.ts", "line": 1 }]
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn1",
+      "from": "browser",
+      "to": "web",
+      "label": "HTTPS · click",
+      "variant": "emphasis",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "conn2",
+      "from": "web",
+      "to": "api",
+      "label": "JSON · /api/*",
+      "variant": "emphasis",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "conn3",
+      "from": "api",
+      "to": "replicate",
+      "label": "POST · create run",
+      "variant": "emphasis",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "conn4",
+      "from": "replicate",
+      "to": "db",
+      "label": "run · scenes · artifacts",
+      "variant": "emphasis",
+      "route": "orthogonal-v",
+      "via": [[796, 408], [490, 408]],
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [150, 436]
+    },
+    {
+      "id": "conn5",
+      "from": "api",
+      "to": "yt",
+      "label": "channel · video lookup",
+      "route": "orthogonal-v",
+      "via": [[531, 125], [105, 125]],
+      "fromSide": "top",
+      "toSide": "top",
+      "labelSegment": 1,
+      "labelDy": -8
+    },
+    {
+      "id": "conn6",
+      "from": "api",
+      "to": "ai",
+      "label": "analysis prompts",
+      "route": "orthogonal-v",
+      "via": [[531, 20], [105, 20]],
+      "fromSide": "top",
+      "toSide": "top",
+      "labelAt": [305, 36]
+    },
+    {
+      "id": "conn7",
+      "from": "replicate",
+      "to": "voice",
+      "label": "narration / scene",
+      "route": "orthogonal-v",
+      "via": [[796, 416], [680, 416]],
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [740, 436]
+    },
+    {
+      "id": "conn8",
+      "from": "replicate",
+      "to": "tools",
+      "label": "spawn ffmpeg",
+      "route": "orthogonal-v",
+      "via": [[796, 400], [845, 400]],
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [834, 392]
+    },
+    {
+      "id": "conn9",
+      "from": "replicate",
+      "to": "media",
+      "label": "asset / scene",
+      "route": "orthogonal-v",
+      "via": [[796, 396], [290, 396]],
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [150, 414]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Internet SaaS · no local data",
+      "wraps": ["yt", "ai"],
+      "pad": 8
+    },
+    {
+      "kind": "region",
+      "label": "Local machine · local-first",
+      "wraps": ["web", "api", "replicate", "tools", "voice", "media", "db"],
+      "pad": 8
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Analysis path",
+      "items": [
+        "YouTube v3 lookups; free LLMs for analysis.",
+        "Google OAuth enables Analytics + quota."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Replication pipeline (primary)",
+      "items": [
+        "One run at a time; scenes ≤ 12 per script.",
+        "Voice Studio :3900; ffmpeg render per run."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust & local data",
+      "items": [
+        "Durable state in project data/ only.",
+        "Downloads path-guarded; setup fetches tools."
+      ]
+    }
+  ]
+}
