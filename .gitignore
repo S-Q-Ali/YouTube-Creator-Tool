@@ -52,3 +52,6 @@ env.download
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# keep the master upgrade plan local (sensitive, uncommitted)
+/Master Plan for New Upgrade.txt
