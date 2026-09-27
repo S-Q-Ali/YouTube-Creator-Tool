@@ -6,29 +6,39 @@ youtube.com — powered by your local Niche-Scope server at `http://localhost:30
 ## What it does
 
 - **Every card, always on**: home, search, channel, shorts and browse grids get a
-  quiet line of readings under the card’s own metadata — no hovering, no clicking.
-  The line paints instantly from the text YouTube already prints, then upgrades
-  itself in place with exact views, runtime and velocity from the server.
+  quiet line of readings under the card's own metadata - no hovering, no clicking.
+  Row one is what the card cannot say (exact views, the real publish date,
+  subscribers); row two is what it means (views per hour, and how far the video
+  sits from what its channel usually gets). The line paints instantly from the
+  text YouTube already prints, then upgrades itself in place from the server.
 - **Thumbnails** (home, search, related, shorts): a small chip shows the grade
   letter plus the score meter.
-- **Watch pages**: a floating card in the top-right shows the video’s SEO score,
+- **Watch pages**: a floating card in the top-right shows the video's SEO score,
   letter grade, views, channel subs, velocity, the 24h trend when it exists, and
   the actionable/performance split.
+- **Watch menu**: a **Download thumbnail** row sits directly under the site's own
+  Audio and captions row, and saves the thumbnail at the best size that exists.
 - **Popup**: server health, your API quota, tracked-item counts, audit status and
   the overlay controls.
 
 ## Card data, and what each mode shows
 
 `Card data` in the popup decides how much a card says. The rule is gaps-only: a
-reading appears on the line only when the card does not already show it.
+reading appears on the line only when the card does not already show it, so the
+channel name and the approximate view count YouTube prints are never repeated.
 
 | Mode | Card shows |
 |---|---|
 | `Off` | nothing on the line (chips still work) |
-| `Velocity only` (default) | views per hour; the runtime appears only on cards whose own thumbnail has no runtime badge |
-| `Everything` | the above plus views and the per-day rate |
+| `Compact` | views per hour, and the outlier when the channel has enough history |
+| `Full` (default) | the above plus exact views, the absolute publish date, subscribers, and the runtime on cards whose own thumbnail has no runtime badge |
 
-`Cards per pass` (24–100) caps how many cards a single DOM pass may touch, which
+An outlier reads as a sentence rather than a score: `3.4× usual`, `typical`, or
+`0.3× usual`. It is measured against the channel's own lifetime views per video,
+so it works for channels nobody has tracked, and the watch card prefers the
+average of the videos it has stored when it has one.
+
+`Cards per pass` (24-100) caps how many cards a single DOM pass may touch, which
 keeps a fast scroll cheap; everything is picked up on the next pass.
 
 ## Overlay preferences
@@ -60,10 +70,14 @@ Content scripts run inside the page, so they can’t fetch `localhost` directly
 
 A page of cards costs **one** request: ids are queued as cards are found and sent
 250ms after the page stops moving, up to 50 per call, which is a single
-`videos.list` call on the server. The server reads its own cache first, so
-re-scrolling a page costs no quota at all.
+`videos.list` call on the server plus one `channels.list` for the subscriber
+counts and the outlier baseline — two quota units per 50 cards. Both read the
+server cache first, so re-scrolling a page costs no quota at all.
 
-No data leaves your machine — everything hits `localhost`.
+No data leaves your machine — everything hits `localhost`. The one exception is
+the thumbnail save, which goes straight to YouTube’s image host through
+`chrome.downloads` in the service worker (`downloads` permission, no host
+permission needed).
 
 ## Endpoints used
 
@@ -88,5 +102,8 @@ Two different numbers, deliberately not conflated:
 
 - Scores only appear for public videos (private/region-blocked videos error gracefully as `—`).
 - If the server is off, the line keeps its first-pass reading and the popup says “Server offline”.
+- The **Download thumbnail** row is only added when YouTube’s menu actually has an
+  Audio and captions row to sit under; on a menu layout we do not recognise the
+  item is skipped rather than drawn in the wrong place.
 - YouTube Studio has no overlays yet; that is Phase C.
 - No build step: plain JS/CSS/HTML, loaded unpacked.

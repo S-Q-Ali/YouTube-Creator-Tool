@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Niche-Scope",
-  "version": "0.3.0",
-  "description": "Always-on SEO scores, letter grades and views-per-hour on every YouTube card, backed by your local Niche-Scope server.",
+  "version": "0.4.0",
+  "description": "Always-on SEO scores, letter grades, views-per-hour, subscribers and outlier scores on every YouTube card, plus a one-click thumbnail save, backed by your local Niche-Scope server.",
   "permissions": ["storage", "downloads"],
   "host_permissions": ["http://localhost:3000/*"],
   "background": {
