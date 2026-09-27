@@ -138,6 +138,19 @@
     return round1(percent / 100) + "× usual";
   }
 
+  /* On a card the outlier has no room for a sentence, so it reads as the score
+     it is: one factor, one decimal, with the explanation left to the title. */
+  function fmtOutlierScore(percent) {
+    if (percent == null || !isFinite(percent) || !(percent > 0)) return "";
+    return (percent / 100).toFixed(1) + "×";
+  }
+
+  function outlierHint(percent) {
+    if (percent == null || !isFinite(percent) || !(percent > 0)) return "";
+    if (percent >= 80 && percent < 125) return "Typical for this channel";
+    return fmtOutlierScore(percent) + " what this channel usually gets";
+  }
+
   function round1(value) {
     return Math.round(value * 10) / 10;
   }
@@ -153,6 +166,8 @@
     fmtSubs,
     fmtDur,
     fmtOutlier,
+    fmtOutlierScore,
+    outlierHint,
     outlierTone
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

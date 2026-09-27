@@ -2,52 +2,52 @@
   "use strict";
 
   /*
-   * What a grid line says, decided without touching the DOM so the wording can
-   * be tested: the context row holds the readings YouTube's own card cannot
-   * show (exact views, the real publish date, subscribers), and the judgment
-   * row holds what they mean (velocity, and how far this video sits from what
-   * its channel usually gets).
+   * What a card's strip says, decided without touching the DOM so the wording
+   * can be tested. YouTube's own card row already prints the channel, the
+   * rounded view count and how old the video is, so the strip repeats none of
+   * it: it carries only the readings a card cannot show — how big the channel
+   * is, how fast the video is moving, and how far it sits from what that
+   * channel usually gets. It waits for the server instead of estimating, so a
+   * number here is never one that has to be corrected a moment later.
    */
 
-  function push(cells, value, className) {
+  function push(cells, value, className, title) {
     if (value === "" || value == null) return;
-    cells.push([value, className]);
+    cells.push([value, className, title]);
   }
 
   function build(options) {
     const opts = options || {};
-    const mode = opts.mode;
-    const facts = opts.facts || {};
     const model = opts.model || {};
     const meta = g.NS_META;
 
+    const subs = [];
     const judge = [];
-    const ctx = [];
 
-    if (mode === "off") {
-      return { ctx, judge, showDur: false, blank: true };
+    if (opts.mode === "off") return { ctx: subs, judge, blank: true };
+
+    const subscribers = meta.fmtSubs(model.subscribers);
+    if (subscribers) push(subs, subscribers + " subs", "ns-line-subs", "Channel subscribers");
+
+    if (model.vph != null) {
+      push(
+        judge,
+        meta.fmtVph(model.vph),
+        model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel",
+        "Views per hour since publish"
+      );
     }
 
-    const vph = model.vph == null ? meta.velocity(facts).vph : model.vph;
-    push(judge, meta.fmtVph(vph), model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel");
     if (model.outlier != null) {
-      push(judge, meta.fmtOutlier(model.outlier), "ns-line-out ns-line-out--" + meta.outlierTone(model.outlier));
+      push(
+        judge,
+        meta.fmtOutlierScore(model.outlier),
+        "ns-line-out ns-line-out--" + meta.outlierTone(model.outlier),
+        meta.outlierHint(model.outlier)
+      );
     }
 
-    if (mode === "full") {
-      const views = model.views != null ? meta.fmtExact(model.views) : facts.views != null ? meta.compact(facts.views) : null;
-      if (views != null) ctx.push([views + " views", "ns-line-v"]);
-      push(ctx, model.publishedAt ? meta.fmtDate(model.publishedAt) : facts.ageLabel, "ns-line-date");
-      const subs = meta.fmtSubs(model.subscribers);
-      if (subs) ctx.push([subs + " subs", "ns-line-subs"]);
-    }
-
-    // The runtime is only ours to print when the thumbnail badge left that
-    // space empty, and it rides with the fuller of the two densities.
-    const showDur = !!(model.durationSeconds && !opts.hasDurationBadge && mode === "full");
-    if (showDur) ctx.push([meta.fmtDur(model.durationSeconds), "ns-line-v ns-line-dur"]);
-
-    return { ctx, judge, showDur, blank: ctx.length === 0 && judge.length === 0 };
+    return { ctx: subs, judge, blank: subs.length === 0 && judge.length === 0 };
   }
 
   g.NS_LINE_MODEL = { build };
