@@ -4,8 +4,12 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" href="ns-theme.css" />
     <style>
-      :root { color-scheme: dark; }
-      * { box-sizing: border-box; }
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         width: 380px;
         margin: 0;
@@ -15,42 +19,163 @@
         font-family: var(--ns-font-ui);
         font-size: 13px;
       }
-      .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-      .head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ns-mute); }
-      .head .dot.on { background: var(--ns-amber); }
-      .head .dot.off { background: var(--ns-bad); }
-      .head h1 { margin: 0; font-size: 13px; font-weight: 600; }
-      .head #serverText { margin-left: auto; font-size: 12px; color: var(--ns-mute); }
-      .section { margin: 14px 0; }
-      .section-title { font-size: 12px; color: var(--ns-mute); margin: 0 0 4px; }
-      .opt { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; }
-      .opt select { margin-left: auto; background: var(--ns-lift); color: var(--ns-ink); border: 1px solid var(--ns-hair);
-        border-radius: var(--ns-radius); padding: 3px 6px; font-family: var(--ns-font-ui); }
-      footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--ns-hair); }
-      footer a { color: var(--ns-amber); text-decoration: none; font-size: 12px; }
-      footer a:hover { text-decoration: underline; }
-      .err { color: var(--ns-bad); font-size: 12px; line-height: 1.5; }
-      .muted { color: var(--ns-mute); }
+      .head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .head .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--ns-mute);
+        align-self: center;
+      }
+      .head .dot.on {
+        background: var(--ns-amber);
+      }
+      .head .dot.off {
+        background: var(--ns-bad);
+      }
+      .head h1 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        flex: 1;
+      }
+      .head #serverText {
+        font-family: var(--ns-font-read);
+        font-size: 12px;
+        font-weight: var(--ns-w-read);
+        font-variation-settings: "wght" var(--ns-w-read);
+        color: var(--ns-mute);
+      }
+      .head #serverText.on {
+        color: var(--ns-amber);
+      }
+      .head #serverText.off {
+        color: var(--ns-bad);
+      }
+      .group {
+        margin-top: 18px;
+      }
+      .group-title {
+        font-size: 11px;
+        color: var(--ns-mute);
+        margin: 0 0 6px;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 32px;
+        padding: 5px 0;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .toggle input {
+        position: absolute;
+        width: 0;
+        height: 0;
+        opacity: 0;
+      }
+      .toggle .track {
+        position: relative;
+        flex: none;
+        width: 26px;
+        height: 14px;
+        border-radius: 999px;
+        background: var(--ns-e3);
+        border: 1px solid var(--ns-hair);
+        transition: background var(--ns-motion) ease-out;
+      }
+      .toggle .track::after {
+        content: "";
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--ns-mute);
+        transition: transform var(--ns-motion) ease-out, background var(--ns-motion) ease-out;
+      }
+      .toggle input:checked + .track {
+        background: rgba(240, 165, 0, 0.2);
+        border-color: var(--ns-amber);
+      }
+      .toggle input:checked + .track::after {
+        transform: translateX(12px);
+        background: var(--ns-amber);
+      }
+      .toggle input:focus-visible + .track {
+        outline: 2px solid var(--ns-amber);
+        outline-offset: 2px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 5px 0;
+        font-size: 12.5px;
+      }
+      .row select {
+        margin-left: auto;
+        min-height: 28px;
+        background: var(--ns-e2);
+        color: var(--ns-ink);
+        border: 1px solid var(--ns-hair);
+        border-radius: var(--ns-radius);
+        padding: 3px 8px;
+        font-family: var(--ns-font-ui);
+      }
+      .row select:focus-visible {
+        outline: 2px solid var(--ns-amber);
+        outline-offset: 1px;
+      }
+      footer {
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid var(--ns-hair);
+      }
+      footer a {
+        color: var(--ns-amber);
+        text-decoration: none;
+        font-size: 12px;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+      .err {
+        color: var(--ns-bad);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .muted {
+        color: var(--ns-mute);
+      }
     </style>
   </head>
   <body data-ns-theme>
-    <div class="head">
+    <header class="head">
       <span class="dot" id="dot"></span>
       <h1>Niche-Scope</h1>
-      <span id="serverText">Checking server…</span>
-    </div>
+      <span id="serverText">checking</span>
+    </header>
     <div id="body">
-      <div class="ns-strip"><span class="k">status</span><span class="v ns-dead">loading</span></div>
+      <div class="ns-strips"><div class="ns-strip"><span class="k">status</span><span class="v ns-dead">loading</span></div></div>
     </div>
-    <div class="section" id="prefsCard">
-      <div class="section-title">Overlay on YouTube</div>
-      <label class="opt"><input type="checkbox" id="showCard" /> Watch-page score card</label>
-      <label class="opt"><input type="checkbox" id="showPills" /> Thumbnail signal pills</label>
-      <label class="opt"><input type="checkbox" id="showHover" /> Thumbnail hover data</label>
-      <label class="opt"><input type="checkbox" id="showResearch" /> Search and channel research</label>
-      <label class="opt"><input type="checkbox" id="showCoach" /> AI coach on watch pages</label>
-      <div class="opt">
-        <span>Pills per pass</span>
+    <section class="group">
+      <div class="group-title">Overlays on YouTube</div>
+      <label class="toggle"><input type="checkbox" id="showCard" /><span class="track"></span><span>Watch-page score card</span></label>
+      <label class="toggle"><input type="checkbox" id="showPills" /><span class="track"></span><span>Thumbnail signal pills</span></label>
+      <label class="toggle"><input type="checkbox" id="showHover" /><span class="track"></span><span>Thumbnail hover data</span></label>
+      <label class="toggle"><input type="checkbox" id="showResearch" /><span class="track"></span><span>Search and channel research</span></label>
+      <label class="toggle"><input type="checkbox" id="showCoach" /><span class="track"></span><span>AI coach on watch pages</span></label>
+      <div class="row">
+        <span>Signals per pass</span>
         <select id="pillLimit">
           <option value="12">12</option>
           <option value="24">24</option>
@@ -58,7 +183,7 @@
           <option value="60">60</option>
         </select>
       </div>
-    </div>
+    </section>
     <footer>
       <a href="http://localhost:3000" target="_blank" rel="noopener">Open dashboard</a>
     </footer>

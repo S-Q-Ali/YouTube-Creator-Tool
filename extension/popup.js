@@ -13,6 +13,7 @@ function strip(label, value, cls = "") {
 function setServer(on, text) {
   dot.className = "dot " + (on ? "on" : "off");
   serverText.textContent = text;
+  serverText.className = on ? "on" : "off";
 }
 
 function fmt(n) {
@@ -61,13 +62,13 @@ async function main() {
   const auth = await get("/api/auth/status");
 
   if (!quota) {
-    setServer(false, "Server offline");
+    setServer(false, "offline");
     body.innerHTML =
       '<p class="err">Server isn\'t running. Start it with <b>npm run dev</b> in the project folder, then reopen this popup.</p>';
     return;
   }
 
-  setServer(true, "Connected to local server");
+  setServer(true, "online");
   const rows = [];
 
   if (comp && comp.dashboard) {
@@ -88,7 +89,9 @@ async function main() {
     rows.push(strip("own channel", auth.connected ? "connected, audit ready" : "not connected"));
   }
 
-  body.innerHTML = rows.length ? rows.join("") : '<p class="muted">No tracked items yet.</p>';
+  body.innerHTML = rows.length
+    ? `<div class="ns-strips">${rows.join("")}</div>`
+    : '<p class="muted">No tracked items yet.</p>';
 }
 
 document.getElementById("showCard").addEventListener("change", savePrefs);
@@ -100,7 +103,7 @@ document.getElementById("pillLimit").addEventListener("change", savePrefs);
 loadPrefs();
 
 main().catch(() => {
-  setServer(false, "Server offline");
+  setServer(false, "offline");
   body.innerHTML =
     '<p class="err">Server isn\'t running. Start it with <b>npm run dev</b>, then reopen this popup.</p>';
 });
