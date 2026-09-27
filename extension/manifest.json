@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Niche-Scope",
-  "version": "0.2.0",
-  "description": "vidIQ-style SEO scores, letter grades and VPH overlaid on YouTube, backed by your local Niche-Scope server.",
+  "version": "0.3.0",
+  "description": "Always-on SEO scores, letter grades and views-per-hour on every YouTube card, backed by your local Niche-Scope server.",
   "permissions": ["storage"],
   "host_permissions": ["http://localhost:3000/*"],
   "background": {
