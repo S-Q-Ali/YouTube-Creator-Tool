@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": ["*://www.youtube.com/*"],
-      "js": ["content.js"],
+      "js": ["lib/nsMeta.js", "content.js"],
       "css": ["ns-theme.css", "content.css"],
       "run_at": "document_idle"
     }
