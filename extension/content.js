@@ -6,19 +6,34 @@
 /* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
 const NS_TOKENS = `
 :host {
+  color-scheme: dark;
   --ns-amber: #f0a500;
   --ns-cyan: #3cc8de;
   --ns-bad: #e4574f;
   --ns-ink: #f2f5f8;
   --ns-mute: #8a94a3;
-  --ns-lift: #1b222b;
-  --ns-glass: rgba(18, 22, 28, 0.85);
-  --ns-hair: rgba(242, 245, 248, 0.12);
-  --ns-tick: rgba(242, 245, 248, 0.22);
+  --ns-lift: #141820;
+  --ns-glass: rgba(14, 17, 22, 0.78);
+  --ns-glass-solid: #141820;
+  --ns-hair: rgba(242, 245, 248, 0.1);
+  --ns-tick: rgba(242, 245, 248, 0.18);
   --ns-radius: 2px;
   --ns-motion: 140ms;
   --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+:host([data-ns-theme="light"]) {
+  color-scheme: light;
+  --ns-amber: #b97a00;
+  --ns-cyan: #0d7a8f;
+  --ns-bad: #c0392b;
+  --ns-ink: #1d232b;
+  --ns-mute: #5b6472;
+  --ns-lift: #ffffff;
+  --ns-glass: rgba(255, 255, 252, 0.85);
+  --ns-glass-solid: #ffffff;
+  --ns-hair: rgba(29, 35, 43, 0.14);
+  --ns-tick: rgba(29, 35, 43, 0.22);
 }`;
 
 const NS_COMPONENTS = `

@@ -3,22 +3,48 @@
  * Every root element carries data-ns-theme so tokens never leak onto the host page. */
 
 [data-ns-theme] {
-  --ns-soot: #12161c;
-  --ns-lift: #1b222b;
+  color-scheme: dark;
+
+  /* True-grey base, elevation by lightness (never shadows). soot → e1 → e2 → e3. */
+  --ns-soot: #0e1116;
+  --ns-lift: #141820;
+  --ns-e1: #141820;
+  --ns-e2: #1a202a;
+  --ns-e3: #202733;
   --ns-ink: #f2f5f8;
   --ns-mute: #8a94a3;
   --ns-amber: #f0a500;
   --ns-cyan: #3cc8de;
   --ns-bad: #e4574f;
-  --ns-glass: rgba(18, 22, 28, 0.85);
-  --ns-hair: rgba(242, 245, 248, 0.12);
-  --ns-tick: rgba(242, 245, 248, 0.22);
+  --ns-glass: rgba(14, 17, 22, 0.78);
+  --ns-glass-solid: #141820;
+  --ns-hair: rgba(242, 245, 248, 0.1);
+  --ns-tick: rgba(242, 245, 248, 0.18);
 
   --ns-radius: 2px;
   --ns-motion: 140ms;
 
   --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+[data-ns-theme="light"] {
+  color-scheme: light;
+
+  --ns-soot: #f3f4f6;
+  --ns-lift: #ffffff;
+  --ns-e1: #ffffff;
+  --ns-e2: #ffffff;
+  --ns-e3: #e9ebee;
+  --ns-ink: #1d232b;
+  --ns-mute: #5b6472;
+  --ns-amber: #b97a00;
+  --ns-cyan: #0d7a8f;
+  --ns-bad: #c0392b;
+  --ns-glass: rgba(255, 255, 252, 0.85);
+  --ns-glass-solid: #ffffff;
+  --ns-hair: rgba(29, 35, 43, 0.14);
+  --ns-tick: rgba(29, 35, 43, 0.22);
 }
 
 /* ------------------------------- Signal meter ------------------------------ */
@@ -146,6 +172,14 @@
   border-radius: 0;
   color: var(--ns-ink);
   font-family: var(--ns-font-ui);
+}
+
+/* Flat data surface — elevation by lightness, no chrome. */
+.ns-panel--flat {
+  background: var(--ns-e1);
+  border: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* --------------------------------- Motion ---------------------------------- */
