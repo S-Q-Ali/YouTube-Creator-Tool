@@ -194,16 +194,15 @@ function gradeOf(score) {
   return "F";
 }
 
+/* NS_META owns the number and date shapes, so a card line and the panel it
+   opens can never spell the same reading two ways. */
 function fmt(n) {
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
-  return String(n);
+  return NS_META.compact(n);
 }
 
 function fmtT(n) {
   if (n == null || isNaN(n)) return "—";
-  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return NS_META.fmtExact(n);
 }
 
 function reducedMotion() {
@@ -235,10 +234,7 @@ function animateNums(root) {
 }
 
 function fmtDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return NS_META.fmtDate(iso) || "—";
 }
 
 function fmtDur(secs) {

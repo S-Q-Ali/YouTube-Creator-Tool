@@ -146,3 +146,74 @@ describe("velocity agrees with the server metric", () => {
     expect(globalThis.NS_META.velocity({ views: null, ageHours: 12 }).vph).toBeNull();
   });
 });
+
+describe("format the card context row", () => {
+  it("writes an exact view count with grouped digits, the way the watch card does", () => {
+    expect(globalThis.NS_META.fmtExact(1_234_567)).toBe("1 234 567");
+  });
+
+  it("keeps small counts un-grouped and exact", () => {
+    expect(globalThis.NS_META.fmtExact(907)).toBe("907");
+    expect(globalThis.NS_META.fmtExact(0)).toBe("0");
+  });
+
+  it("rounds a reading the API gave as a float", () => {
+    expect(globalThis.NS_META.fmtExact(1_234_567.4)).toBe("1 234 567");
+  });
+
+  it("returns an empty string rather than a placeholder for a missing count", () => {
+    expect(globalThis.NS_META.fmtExact(null)).toBe("");
+    expect(globalThis.NS_META.fmtExact(undefined)).toBe("");
+    expect(globalThis.NS_META.fmtExact(Number.NaN)).toBe("");
+  });
+
+  it("writes an absolute publish date, which is the reading a card never shows", () => {
+    // en-GB short month, the same string the watch card's posted row prints.
+    expect(globalThis.NS_META.fmtDate("2026-09-27T12:00:00.000Z")).toBe("27 Sept 2026");
+  });
+
+  it("returns an empty string for a date that is absent or unparseable", () => {
+    expect(globalThis.NS_META.fmtDate("")).toBe("");
+    expect(globalThis.NS_META.fmtDate(null)).toBe("");
+    expect(globalThis.NS_META.fmtDate("not a date")).toBe("");
+  });
+
+  it("abbreviates a subscriber count without a trailing zero", () => {
+    expect(globalThis.NS_META.fmtSubs(128_000)).toBe("128K");
+    expect(globalThis.NS_META.fmtSubs(1_284_000)).toBe("1.3M");
+    expect(globalThis.NS_META.fmtSubs(940)).toBe("940");
+  });
+
+  it("returns an empty string for an unknown subscriber count", () => {
+    expect(globalThis.NS_META.fmtSubs(null)).toBe("");
+  });
+});
+
+describe("write an outlier reading in words", () => {
+  it("calls a video twice its usual by a factor", () => {
+    expect(globalThis.NS_META.fmtOutlier(340)).toBe("3.4× usual");
+  });
+
+  it("calls a video on its channel's usual pace typical instead of 1x", () => {
+    expect(globalThis.NS_META.fmtOutlier(100)).toBe("typical");
+  });
+
+  it("keeps a modest overperformer factual", () => {
+    expect(globalThis.NS_META.fmtOutlier(160)).toBe("1.6× usual");
+  });
+
+  it("shows a video well under its channel's pace as a fraction", () => {
+    expect(globalThis.NS_META.fmtOutlier(30)).toBe("0.3× usual");
+  });
+
+  it("tints by how far from usual the video sits", () => {
+    expect(globalThis.NS_META.outlierTone(340)).toBe("hot");
+    expect(globalThis.NS_META.outlierTone(100)).toBe("normal");
+    expect(globalThis.NS_META.outlierTone(30)).toBe("cool");
+  });
+
+  it("returns an empty string when there is nothing to compare against", () => {
+    expect(globalThis.NS_META.fmtOutlier(null)).toBe("");
+    expect(globalThis.NS_META.outlierTone(null)).toBe("normal");
+  });
+});
