@@ -56,9 +56,7 @@
    the number is the identity, the separators are a whisper, amber is reserved
    for momentum and cyan for rate. */
 .ns-line {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
+  display: block;
   margin-top: 2px;
   font-family: var(--ns-font-read);
   font-size: 12px;
@@ -66,8 +64,22 @@
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
   color: var(--ns-mute);
+}
+
+.ns-line--blank {
+  display: none;
+}
+
+.ns-line-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.ns-line-row:empty {
+  display: none;
 }
 
 .ns-line-v {
@@ -80,6 +92,19 @@
 
 .ns-line-vel--spike {
   color: var(--ns-amber);
+}
+
+.ns-line-out {
+  color: var(--ns-ink);
+}
+
+.ns-line-out--hot {
+  color: var(--ns-amber);
+}
+
+.ns-line-out--cool {
+  color: var(--ns-mute);
+  font-variation-settings: "wght" 400;
 }
 
 .ns-line-sep {

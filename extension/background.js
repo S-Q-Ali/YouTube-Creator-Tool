@@ -6,7 +6,7 @@ const TTL_MS = 10 * 60 * 1000;
 const SLOW_TIMEOUT = 60 * 1000; // AI + yt-dlp routes can take a while
 const FAST_TIMEOUT = 15 * 1000;
 const PREFS_KEY = "ns:prefs";
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "line", tileLimit: 60 };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "full", tileLimit: 60 };
 
 // Never session-cache AI or live-search responses: results vary per query and can
 // exceed the per-item quota (server already caches AI results in its own DB).

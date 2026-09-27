@@ -48,7 +48,7 @@ async function loadPrefs() {
   document.getElementById("showPills").checked = !!p.showPills;
   document.getElementById("showResearch").checked = p.showResearch !== false;
   document.getElementById("showCoach").checked = p.showCoach !== false;
-  document.getElementById("dataMode").value = p.dataMode || "line";
+  document.getElementById("dataMode").value = p.dataMode || "full";
   document.getElementById("tileLimit").value = String(p.tileLimit || 60);
   document.getElementById("pillLimit").value = String(p.pillLimit || 24);
 }
@@ -61,7 +61,7 @@ function savePrefs() {
       showPills: document.getElementById("showPills").checked,
       showResearch: document.getElementById("showResearch").checked,
       showCoach: document.getElementById("showCoach").checked,
-      dataMode: document.getElementById("dataMode").value || "line",
+      dataMode: document.getElementById("dataMode").value || "full",
       tileLimit: Number(document.getElementById("tileLimit").value) || 60,
       pillLimit: Number(document.getElementById("pillLimit").value) || 24,
     },

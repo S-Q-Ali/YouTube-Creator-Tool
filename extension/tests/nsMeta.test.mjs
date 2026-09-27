@@ -187,6 +187,18 @@ describe("format the card context row", () => {
   it("returns an empty string for an unknown subscriber count", () => {
     expect(globalThis.NS_META.fmtSubs(null)).toBe("");
   });
+
+  it("writes a runtime the way a card prints it", () => {
+    expect(globalThis.NS_META.fmtDur(222)).toBe("3:42");
+    expect(globalThis.NS_META.fmtDur(65)).toBe("1:05");
+    expect(globalThis.NS_META.fmtDur(3661)).toBe("1:01:01");
+    expect(globalThis.NS_META.fmtDur(0)).toBe("0:00");
+  });
+
+  it("returns an empty string for a runtime that is not a number", () => {
+    expect(globalThis.NS_META.fmtDur(null)).toBe("");
+    expect(globalThis.NS_META.fmtDur(Number.NaN)).toBe("");
+  });
 });
 
 describe("write an outlier reading in words", () => {

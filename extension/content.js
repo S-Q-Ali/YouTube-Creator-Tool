@@ -160,16 +160,26 @@ function api(path, opts) {
   });
 }
 
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "line", tileLimit: 60 };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "full", tileLimit: 60 };
+const DATA_MODES = ["off", "compact", "full"];
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
+
+/* Reads a stored preference set and repairs anything the current version no
+   longer understands, so an old "line" mode becomes today's full block. */
+function mergePrefs(stored) {
+  const merged = { ...DEFAULT_PREFS, ...(stored || {}) };
+  if (!DATA_MODES.includes(merged.dataMode)) merged.dataMode = DEFAULT_PREFS.dataMode;
+  return merged;
+}
 
 function ensurePrefs() {
   chrome.runtime.sendMessage({ type: "prefs:get" }, (res) => {
     if (res && res.ok && res.data) {
-      prefs = { ...DEFAULT_PREFS, ...res.data };
+      prefs = mergePrefs(res.data);
       routeOverlays();
       scanThumbnails();
+      scanTiles();
     }
   });
 }
@@ -235,14 +245,6 @@ function animateNums(root) {
 
 function fmtDate(iso) {
   return NS_META.fmtDate(iso) || "—";
-}
-
-function fmtDur(secs) {
-  if (secs == null || isNaN(secs)) return "—";
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  if (m >= 60) return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function esc(s) {
@@ -618,31 +620,40 @@ function lineSep() {
   return lineCell("·", "ns-line-sep");
 }
 
-/* Replace the readings in place; a tile never grows, shrinks or reflows twice. */
+function paintRow(row, cells) {
+  while (row.firstChild) row.removeChild(row.firstChild);
+  for (let i = 0; i < cells.length; i++) {
+    if (i > 0) row.append(lineSep());
+    row.append(lineCell(cells[i][0], cells[i][1]));
+  }
+}
+
+/* Replace the readings in place; a tile never grows, shrinks or reflows twice.
+   The wording is decided and tested in lib/lineModel.js; this only paints it. */
 function fillLine(row, model) {
   const line = row.line;
-  const facts = model.tier0;
-  const vph = model.vph == null ? NS_META.velocity(facts).vph : model.vph;
-  if (vph == null) {
-    line.textContent = "";
-    return;
-  }
+  const built = NS_LINE_MODEL.build({
+    mode: prefs.dataMode,
+    facts: row.tier0 || {},
+    model,
+    hasDurationBadge: row.hasDurationBadge
+  });
 
-  while (line.firstChild) line.removeChild(line.firstChild);
-  if (model.views != null && prefs.dataMode === "full") line.append(lineCell(NS_META.compact(model.views), "ns-line-v"));
-  if (model.durationSeconds) line.append(lineCell(fmtDur(model.durationSeconds), "ns-line-v ns-line-dur"));
-  if (line.childNodes.length) line.append(lineSep());
-  line.append(lineCell(NS_META.fmtVph(vph), model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel"));
-  if (prefs.dataMode === "full" && model.vphDay != null) {
-    line.append(lineSep(), lineCell(NS_META.fmtVphDay(model.vphDay), "ns-line-extra"));
-  }
-  line.setAttribute("data-show-dur", model.durationSeconds && !row.hasDurationBadge ? "1" : "0");
+  paintRow(line.children[0], built.ctx);
+  paintRow(line.children[1], built.judge);
+  line.setAttribute("data-show-dur", built.showDur ? "1" : "0");
+  line.classList.toggle("ns-line--blank", built.blank);
 }
 
 function buildLine() {
   const line = document.createElement("div");
   line.className = "ns-line";
   line.setAttribute("data-ns-theme", currentTheme());
+  for (const cls of ["ns-line-ctx", "ns-line-judge"]) {
+    const part = document.createElement("div");
+    part.className = "ns-line-row " + cls;
+    line.append(part);
+  }
   return line;
 }
 
@@ -684,7 +695,11 @@ function scanTiles() {
       spike: false
     };
     fillLine(row, row);
-    if (!tileRows.has(id)) tileRows.set(id, row);
+    // The same video can appear in more than one slot on a page; every one of
+    // those lines has to be upgraded, not just the first.
+    const known = tileRows.get(id);
+    if (known) known.push(row);
+    else tileRows.set(id, [row]);
     if (gridMem.has(id)) applyModel(id, gridMem.get(id));
     else queueUpgrade(id);
   }
@@ -704,6 +719,15 @@ function queueUpgrade(id) {
   gridTimer = setTimeout(flushUpgrades, 250);
 }
 
+/** A line already on screen is never re-scanned, so a failed batch has to be
+    requeued here or those cards stay on Tier 0 readings forever. */
+const MAX_GRID_ATTEMPTS = 3;
+let gridAttempts = 0;
+
+function requeueGrid(ids) {
+  for (const id of ids) if (!gridMem.has(id)) pendingGrid.add(id);
+}
+
 /* One request per scroll settle, capped at the endpoint's 50-id page. */
 async function flushUpgrades() {
   if (gridInFlight || pendingGrid.size === 0) return;
@@ -713,12 +737,23 @@ async function flushUpgrades() {
   try {
     const res = await api("/api/videos/grid", { method: "POST", body: { ids } });
     const rows = res && res.ok && res.data ? res.data.rows : null;
-    if (rows) for (const data of rows) storeRow(data.id, data);
+    if (rows && rows.length > 0) {
+      gridAttempts = 0;
+      for (const data of rows) storeRow(data.id, data);
+      const answered = new Set(rows.map((r) => r.id));
+      requeueGrid(ids.filter((id) => !answered.has(id)));
+    } else {
+      gridAttempts++;
+      requeueGrid(ids);
+    }
   } catch {
-    // The Tier 0 reading stays on screen; the next pass retries.
+    gridAttempts++;
+    requeueGrid(ids);
   }
   gridInFlight = false;
-  if (pendingGrid.size > 0) flushUpgrades();
+  if (pendingGrid.size === 0) return;
+  if (gridAttempts < MAX_GRID_ATTEMPTS) setTimeout(flushUpgrades, 2500);
+  else pendingGrid.clear();
 }
 
 function storeRow(id, data) {
@@ -726,7 +761,10 @@ function storeRow(id, data) {
     vph: data.velocity && data.velocity.vph != null ? data.velocity.vph : null,
     vphDay: data.velocity ? data.velocity.vphDay : null,
     views: data.viewCount,
+    publishedAt: data.publishedAt,
     durationSeconds: data.durationSeconds,
+    subscribers: data.subscribers,
+    outlier: data.outlier,
     score: data.score,
     grade: data.grade,
     spike: !!data.spike
@@ -738,14 +776,19 @@ function storeRow(id, data) {
 }
 
 function applyModel(id, model) {
-  const row = tileRows.get(id);
-  if (!row) return;
-  row.vph = model.vph;
-  row.vphDay = model.vphDay;
-  row.views = model.views;
-  row.durationSeconds = model.durationSeconds;
-  row.spike = model.spike;
-  fillLine(row, model);
+  const rows = tileRows.get(id);
+  if (!rows) return;
+  for (const row of rows) {
+    row.vph = model.vph;
+    row.vphDay = model.vphDay;
+    row.views = model.views;
+    row.publishedAt = model.publishedAt;
+    row.durationSeconds = model.durationSeconds;
+    row.subscribers = model.subscribers;
+    row.outlier = model.outlier;
+    row.spike = model.spike;
+    fillLine(row, model);
+  }
 }
 
 /* ------------------------- Thumbnail signal pills ------------------------- */
@@ -1074,13 +1117,16 @@ function routeOverlays() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !changes[PREFS_KEY]) return;
-  prefs = { ...DEFAULT_PREFS, ...(changes[PREFS_KEY].newValue || {}) };
+  const before = prefs.dataMode;
+  prefs = mergePrefs(changes[PREFS_KEY].newValue);
   routeOverlays();
   if (prefs.showPills) {
     badgedIds.clear();
     scanThumbnails();
   }
-  if (changes[PREFS_KEY].newValue && changes[PREFS_KEY].newValue.dataMode !== prefs.dataMode) {
+  // Density and card data both change what a line says, so redraw every line
+  // rather than guess which preference the change was about.
+  if (prefs.dataMode !== before) {
     stripLines();
     scanTiles();
   }

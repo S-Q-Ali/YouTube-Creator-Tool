@@ -116,6 +116,14 @@
     return compact(subs).replace(/\.0(?=[KMB]$)/, "");
   }
 
+  function fmtDur(secs) {
+    if (secs == null || !isFinite(secs)) return "";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    if (m >= 60) return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
   /* An outlier reads as a sentence, not a score: a factor, or "typical". */
   function outlierTone(percent) {
     if (percent == null || !isFinite(percent)) return "normal";
@@ -143,6 +151,7 @@
     fmtExact,
     fmtDate,
     fmtSubs,
+    fmtDur,
     fmtOutlier,
     outlierTone
   };

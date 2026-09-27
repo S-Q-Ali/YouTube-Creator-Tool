@@ -65,6 +65,12 @@
         color: var(--ns-mute);
         margin: 0 0 6px;
       }
+      .hint {
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--ns-mute);
+        margin: 6px 0 0;
+      }
       .toggle {
         display: flex;
         align-items: center;
@@ -173,14 +179,15 @@
       <label class="toggle"><input type="checkbox" id="showPills" /><span class="track"></span><span>Thumbnail verdict chips</span></label>
       <label class="toggle"><input type="checkbox" id="showResearch" /><span class="track"></span><span>Search and channel research</span></label>
       <label class="toggle"><input type="checkbox" id="showCoach" /><span class="track"></span><span>AI coach on watch pages</span></label>
-      <div class="row">
-        <span>Card data</span>
-        <select id="dataMode">
-          <option value="off">Off</option>
-          <option value="line">Velocity only</option>
-          <option value="full">Everything</option>
-        </select>
-      </div>
+        <div class="row">
+          <span>Card data</span>
+          <select id="dataMode">
+            <option value="off">Off</option>
+            <option value="compact">Compact</option>
+            <option value="full">Full</option>
+          </select>
+        </div>
+        <p class="hint">Full adds exact views, the publish date and subscribers above the velocity line. Compact shows the velocity and outlier only.</p>
       <div class="row">
         <span>Cards per pass</span>
         <select id="tileLimit">
