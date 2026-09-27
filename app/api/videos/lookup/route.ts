@@ -2,6 +2,7 @@ import { fetchChannels, fetchVideos, parseVideoInput, YoutubeApiError } from "@/
 import { computeSeoScore } from "@/lib/scorecard";
 import { computeVph } from "@/lib/vphEngine";
 import { isTracked } from "@/lib/tracking";
+import { all } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -9,6 +10,18 @@ export const maxDuration = 60;
 interface Body {
   url?: string;
   focusKeyword?: string;
+}
+
+/** Channel-avg views from locally persisted snapshots (no extra API quota). */
+function channelContext(channelId: string, videoId: string) {
+  const rows = all<{ view_count: number | null }>(
+    "SELECT view_count FROM videos WHERE channel_id = $c AND video_id != $v AND view_count IS NOT NULL",
+    { $c: channelId, $v: videoId }
+  );
+  const views = rows.map((r) => r.view_count ?? 0).filter((v) => v > 0);
+  if (views.length === 0) return null;
+  const avg = views.reduce((a, b) => a + b, 0) / views.length;
+  return { channelAvgViews: Math.round(avg), watchedVideos: views.length };
 }
 
 export async function POST(request: Request) {
@@ -45,6 +58,8 @@ export async function POST(request: Request) {
       focusKeyword: body.focusKeyword?.trim() || undefined,
     });
     const vph = computeVph(video.videoId);
+    const ctx = channel && video.channelId ? channelContext(video.channelId, video.videoId) : null;
+    const outlier = ctx && ctx.channelAvgViews > 0 ? Math.round((video.viewCount / ctx.channelAvgViews) * 100) : null;
 
     return Response.json({
       kind: "video",
@@ -54,6 +69,8 @@ export async function POST(request: Request) {
         : undefined,
       seo,
       vph,
+      channelContext: ctx,
+      outlier,
       tracked: isTracked("video", video.videoId),
     });
   } catch (err) {

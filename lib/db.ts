@@ -239,6 +239,14 @@ CREATE TABLE IF NOT EXISTS replication_runs (
 CREATE INDEX IF NOT EXISTS idx_replication_status ON replication_runs(status);
 CREATE INDEX IF NOT EXISTS idx_replication_channel ON replication_runs(channel_id);
 CREATE INDEX IF NOT EXISTS idx_replication_created ON replication_runs(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ai_cache (
+  action TEXT NOT NULL,
+  inputs_hash TEXT PRIMARY KEY,
+  result_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_cache_created ON ai_cache(created_at DESC);
 `;
 
 // Niche ID migration: old → new
