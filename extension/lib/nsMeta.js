@@ -7,7 +7,7 @@
  *
  * Loaded before content.js as a classic content script (content scripts are not
  * modules, so it publishes itself on globalThis) and driven in tests by
- * extension/__tests__/nsMeta.test.mjs, which also pins this file's velocity
+ * extension/tests/nsMeta.test.mjs, which also pins this file's velocity
  * maths to lib/velocity.ts so the instant reading and the upgraded reading can
  * never disagree.
  */
