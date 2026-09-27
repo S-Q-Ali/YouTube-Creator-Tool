@@ -667,10 +667,76 @@ function scanTiles() {
     const meta = tile.querySelector(NS_LINE_META) || link;
     meta.parentNode.insertBefore(line, meta.nextSibling);
     linedTiles.add(tile);
-    const row = { line, tier0: facts, vph: null, views: null, durationSeconds: null, vphDay: null, spike: false };
+    const row = {
+      line,
+      tier0: facts,
+      hasDurationBadge: !!tile.querySelector(NS_LINE_DURATION_BADGE),
+      vph: null,
+      views: null,
+      durationSeconds: null,
+      vphDay: null,
+      spike: false
+    };
     fillLine(row, row);
     if (!tileRows.has(id)) tileRows.set(id, row);
+    if (gridMem.has(id)) applyModel(id, gridMem.get(id));
+    else queueUpgrade(id);
   }
+}
+
+/* --------------------- Tier 1: upgrade the painted line --------------------- */
+
+const gridMem = new Map();
+const pendingGrid = new Set();
+let gridTimer = null;
+let gridInFlight = false;
+
+function queueUpgrade(id) {
+  if (gridMem.has(id) || pendingGrid.has(id)) return;
+  pendingGrid.add(id);
+  clearTimeout(gridTimer);
+  gridTimer = setTimeout(flushUpgrades, 250);
+}
+
+/* One request per scroll settle, capped at the endpoint's 50-id page. */
+async function flushUpgrades() {
+  if (gridInFlight || pendingGrid.size === 0) return;
+  const ids = [...pendingGrid].slice(0, 50);
+  ids.forEach((id) => pendingGrid.delete(id));
+  gridInFlight = true;
+  try {
+    const res = await api("/api/videos/grid", { method: "POST", body: { ids } });
+    const rows = res && res.ok && res.data ? res.data.rows : null;
+    if (rows) for (const data of rows) storeRow(data.id, data);
+  } catch {
+    // The Tier 0 reading stays on screen; the next pass retries.
+  }
+  gridInFlight = false;
+  if (pendingGrid.size > 0) flushUpgrades();
+}
+
+function storeRow(id, data) {
+  const model = {
+    vph: data.velocity && data.velocity.vph != null ? data.velocity.vph : null,
+    vphDay: data.velocity ? data.velocity.vphDay : null,
+    views: data.viewCount,
+    durationSeconds: data.durationSeconds,
+    spike: !!data.spike
+  };
+  gridMem.set(id, model);
+  if (gridMem.size > 400) gridMem.clear();
+  applyModel(id, model);
+}
+
+function applyModel(id, model) {
+  const row = tileRows.get(id);
+  if (!row) return;
+  row.vph = model.vph;
+  row.vphDay = model.vphDay;
+  row.views = model.views;
+  row.durationSeconds = model.durationSeconds;
+  row.spike = model.spike;
+  fillLine(row, model);
 }
 
 /* ------------------------- Thumbnail signal pills ------------------------- */
