@@ -1,7 +1,14 @@
 /* Niche-Scope content script: SEO scores + research overlays on YouTube.
  * Fetches happen in the background worker (avoids page CORS).
- * Surfaces: watch-page card (score + tags + AI coach), thumbnail hover data +
- * signal pills, search-page keyword panel, channel research card. */
+ * Surfaces: always-on grid data lines, thumbnail verdict chips, watch-page
+ * card (score + tags + AI coach), search-page keyword panel, channel research
+ * card. */
+
+const NS_LINE_TILE = "yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, ytd-playlist-video-renderer";
+const NS_LINE_LINK = 'a[href*="/watch?v="], a[href*="/shorts/"], a[href*="/live/"], a[href*="youtu.be/"]';
+const NS_LINE_META = ".yt-content-metadata-view-model__metadata-line, #metadata-line, #metadata, ytd-video-meta-renderer, .yt-content-metadata-view-model";
+const NS_LINE_DURATION_BADGE =
+  "ytd-thumbnail-overlay-time-status-renderer, .yt-thumbnail-overlay-time-status-renderer, .badge-shape-wiz__thumbnail-badge, [class*='TimeStatus'], [class*='time-status']";
 
 /* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
 const NS_TOKENS = `
@@ -153,7 +160,7 @@ function api(path, opts) {
   });
 }
 
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showHover: true, showResearch: true, showCoach: true };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showHover: true, showResearch: true, showCoach: true, dataMode: "line", tileLimit: 60 };
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
 
@@ -572,6 +579,100 @@ function showWatchCard(videoId) {
   lookupVideo(videoId).then((data) => renderCard(data));
 }
 
+/* ------------------------- Always-on grid data line ------------------------- */
+
+/* Painted twice: once from the text YouTube already shows (no request), then
+   upgraded in place from /api/videos/grid. Scoped to grid routes so a line
+   never lands on the watch page or on the hero of the page you opened. */
+
+const NS_GRID_HOSTS = "ytd-rich-grid-renderer, ytd-section-list-renderer, ytd-item-section-renderer, ytd-browse[page-subtype='channels'], ytd-browse[page-subtype='playlists']";
+const linedTiles = new WeakSet();
+const tileRows = new Map();
+let linesPass = 0;
+
+function gridPage() {
+  const p = location.pathname;
+  if (currentVideoId()) return false;
+  return p === "/" || p.startsWith("/results") || p.startsWith("/feed") || /^\/@/.test(p) || p.startsWith("/channel/") || p.startsWith("/c/") || p.startsWith("/browse/");
+}
+
+function findLineText(tile) {
+  const el = tile.querySelector(NS_LINE_META);
+  return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
+}
+
+function lineCell(text, className) {
+  const cell = document.createElement("span");
+  cell.className = className;
+  cell.textContent = text;
+  return cell;
+}
+
+function lineSep() {
+  return lineCell("·", "ns-line-sep");
+}
+
+/* Replace the readings in place; a tile never grows, shrinks or reflows twice. */
+function fillLine(row, model) {
+  const line = row.line;
+  const facts = model.tier0;
+  const vph = model.vph == null ? NS_META.velocity(facts).vph : model.vph;
+  if (vph == null) {
+    line.textContent = "";
+    return;
+  }
+
+  while (line.firstChild) line.removeChild(line.firstChild);
+  if (model.views != null && prefs.dataMode === "full") line.append(lineCell(NS_META.compact(model.views), "ns-line-v"));
+  if (model.durationSeconds) line.append(lineCell(NS_META.fmtDuration(model.durationSeconds), "ns-line-v ns-line-dur"));
+  if (line.childNodes.length) line.append(lineSep());
+  line.append(lineCell(NS_META.fmtVph(vph), model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel"));
+  if (prefs.dataMode === "full" && model.vphDay != null) {
+    line.append(lineSep(), lineCell(NS_META.fmtVphDay(model.vphDay), "ns-line-extra"));
+  }
+  line.setAttribute("data-show-dur", model.durationSeconds && !row.hasDurationBadge ? "1" : "0");
+}
+
+function buildLine() {
+  const line = document.createElement("div");
+  line.className = "ns-line";
+  line.setAttribute("data-ns-theme", currentTheme());
+  return line;
+}
+
+function scanTiles() {
+  if (prefs.dataMode === "off" || !gridPage()) return;
+  linesPass++;
+  const pass = linesPass;
+  const budget = prefs.tileLimit || 60;
+  const hosts = document.querySelectorAll(NS_GRID_HOSTS);
+  const tiles = [];
+  for (const host of hosts) {
+    for (const tile of host.querySelectorAll(NS_LINE_TILE)) {
+      if (tiles.length >= budget) break;
+      if (tile.closest("ytd-ad-slot-renderer, ytd-promoted-sparkles-web-renderer")) continue;
+      if (tile.querySelector(".ns-line")) continue;
+      tiles.push(tile);
+    }
+  }
+  for (const tile of tiles) {
+    if (pass !== linesPass) return;
+    const link = tile.querySelector(NS_LINE_LINK);
+    const id = link && videoIdFromHref(link.getAttribute("href"));
+    const text = findLineText(tile);
+    if (!id || !text) continue;
+    const facts = NS_META.parse(text);
+    if (facts.views == null) continue;
+    const line = buildLine();
+    const meta = tile.querySelector(NS_LINE_META) || link;
+    meta.parentNode.insertBefore(line, meta.nextSibling);
+    linedTiles.add(tile);
+    const row = { line, tier0: facts, vph: null, views: null, durationSeconds: null, vphDay: null, spike: false };
+    fillLine(row, row);
+    if (!tileRows.has(id)) tileRows.set(id, row);
+  }
+}
+
 /* ------------------------- Thumbnail signal pills ------------------------- */
 
 const badgedIds = new Set();
@@ -983,11 +1084,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
     badgedIds.clear();
     scanThumbnails();
   }
+  if (changes[PREFS_KEY].newValue && changes[PREFS_KEY].newValue.dataMode !== prefs.dataMode) {
+    stripLines();
+    scanTiles();
+  }
   if (!prefs.showHover) hideTip();
 });
 
+function stripLines() {
+  tileRows.clear();
+  document.querySelectorAll(".ns-line").forEach((line) => {
+    if (line.parentNode) line.parentNode.removeChild(line);
+  });
+}
+
 function onDomChange() {
   scanThumbnails();
+  scanTiles();
 }
 
 let observer = null;
@@ -996,6 +1109,7 @@ function init() {
   ensurePrefs();
   routeOverlays();
   scanThumbnails();
+  scanTiles();
 
   document.addEventListener("pointerover", (e) => {
     if (!prefs.showHover) return;

@@ -50,6 +50,47 @@
   --ns-tick: rgba(29, 35, 43, 0.22);
 }
 
+/* ------------------------- Always-on grid data line ------------------------- */
+
+/* One quiet line of readings under a card's own metadata. No box, no rule:
+   the number is the identity, the separators are a whisper, amber is reserved
+   for momentum and cyan for rate. */
+.ns-line {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 2px;
+  font-family: var(--ns-font-read);
+  font-size: 12px;
+  font-variation-settings: "wght" var(--ns-w-read);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--ns-mute);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ns-line-v {
+  color: var(--ns-ink);
+}
+
+.ns-line-vel {
+  color: var(--ns-cyan);
+}
+
+.ns-line-vel--spike {
+  color: var(--ns-amber);
+}
+
+.ns-line-sep {
+  color: var(--ns-tick);
+}
+
+.ns-line-extra {
+  color: var(--ns-mute);
+  font-variation-settings: "wght" 400;
+}
+
 /* ------------------------------- Signal meter ------------------------------ */
 
 .ns-meter {
