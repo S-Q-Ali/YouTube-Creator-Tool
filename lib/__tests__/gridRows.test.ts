@@ -81,4 +81,36 @@ describe("buildGridRow", () => {
 
     expect(row.likeCount).toBeNull();
   });
+
+  it("adds the channel readings when a channel is supplied", () => {
+    const row = buildGridRow(makeVideo({ viewCount: 480_000 }), NOW, { subscriberCount: 128_000, averageViews: 12_000 });
+
+    expect(row.subscribers).toBe(128_000);
+    expect(row.outlier).toBe(4000);
+  });
+
+  it("leaves channel readings null when the page had no channel data", () => {
+    const row = buildGridRow(makeVideo(), NOW);
+
+    expect(row.subscribers).toBeNull();
+    expect(row.outlier).toBeNull();
+  });
+
+  it("keeps subscribers even when the average is too thin to compare against", () => {
+    const row = buildGridRow(makeVideo(), NOW, { subscriberCount: 900, averageViews: null });
+
+    expect(row.subscribers).toBe(900);
+    expect(row.outlier).toBeNull();
+  });
+
+  it("treats a zero or missing subscriber count as unknown", () => {
+    expect(buildGridRow(makeVideo(), NOW, { subscriberCount: 0, averageViews: 1 }).subscribers).toBeNull();
+    expect(buildGridRow(makeVideo(), NOW, { subscriberCount: null, averageViews: 1 }).subscribers).toBeNull();
+  });
+
+  it("carries the thumbnail url so a card can offer the image without another request", () => {
+    const row = buildGridRow(makeVideo(), NOW);
+
+    expect(row.thumbnailUrl).toBe("https://i.ytimg.com/vi/dQw4w9WgXcQ/hq.jpg");
+  });
 });

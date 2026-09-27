@@ -167,7 +167,7 @@ interface RawVideo {
     defaultAudioLanguage?: string;
     categoryId?: string;
     tags?: string[];
-    thumbnails?: { high?: { url?: string }; medium?: { url?: string }; default?: { url?: string } };
+    thumbnails?: { maxres?: { url?: string }; high?: { url?: string }; medium?: { url?: string }; default?: { url?: string } };
   };
   contentDetails?: { duration?: string };
   statistics?: { viewCount?: string; likeCount?: string; commentCount?: string; favoriteCount?: string };
@@ -181,7 +181,7 @@ interface RawChannel {
     customUrl?: string;
     publishedAt?: string;
     country?: string;
-    thumbnails?: { high?: { url?: string }; medium?: { url?: string }; default?: { url?: string } };
+    thumbnails?: { maxres?: { url?: string }; high?: { url?: string }; medium?: { url?: string }; default?: { url?: string } };
   };
   statistics?: { subscriberCount?: string; videoCount?: string; viewCount?: string };
   topicDetails?: { topicCategories?: string[] };
@@ -190,7 +190,7 @@ interface RawChannel {
 
 function toVideoInfo(v: RawVideo): VideoInfo {
   const thumb = v.snippet?.thumbnails;
-  const url = thumb?.high?.url ?? thumb?.medium?.url ?? thumb?.default?.url ?? "";
+  const url = thumb?.maxres?.url ?? thumb?.high?.url ?? thumb?.medium?.url ?? thumb?.default?.url ?? "";
   return {
     videoId: v.id,
     channelId: v.snippet?.channelId ?? "",
@@ -211,7 +211,7 @@ function toVideoInfo(v: RawVideo): VideoInfo {
 
 function toChannelInfo(c: RawChannel): ChannelInfo {
   const thumb = c.snippet?.thumbnails;
-  const url = thumb?.high?.url ?? thumb?.medium?.url ?? thumb?.default?.url ?? "";
+  const url = thumb?.maxres?.url ?? thumb?.high?.url ?? thumb?.medium?.url ?? thumb?.default?.url ?? "";
   return {
     channelId: c.id,
     title: c.snippet?.title ?? "",

@@ -1,5 +1,6 @@
-import { fetchVideos, YoutubeApiError } from "@/lib/youtubeClient";
-import { buildGridRow } from "@/lib/gridRows";
+import { fetchChannels, fetchVideos, YoutubeApiError } from "@/lib/youtubeClient";
+import { buildGridRow, type GridChannelContext } from "@/lib/gridRows";
+import { channelAverageViews } from "@/lib/outlier";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,10 +27,31 @@ export async function POST(request: Request) {
   }
 
   try {
-    // fetchVideos reads its own TTL cache first, so re-scrolling a page costs no
-    // quota at all.
+    // fetchVideos and fetchChannels both read their own TTL cache first, so
+    // re-scrolling a page costs no quota at all. The channel round-trip is a
+    // second unit per 50 cards and buys the subscriber count and the average
+    // every outlier is measured against.
     const videos = await fetchVideos(ids);
-    return Response.json({ kind: "grid", rows: videos.map((video) => buildGridRow(video)) });
+    const channelIds = [...new Set(videos.map((video) => video.channelId).filter(Boolean))];
+    let contextById = new Map<string, GridChannelContext>();
+    try {
+      const channels = channelIds.length > 0 ? await fetchChannels(channelIds.slice(0, MAX_IDS)) : [];
+      contextById = new Map(
+        channels.map((channel) => [
+          channel.channelId,
+          { subscriberCount: channel.subscriberCount, averageViews: channelAverageViews(channel) }
+        ])
+      );
+    } catch {
+      // Subscriber counts and outliers are additions to a page of cards, not
+      // the page itself: ship the video rows without them.
+      contextById = new Map();
+    }
+
+    return Response.json({
+      kind: "grid",
+      rows: videos.map((video) => buildGridRow(video, undefined, video.channelId ? contextById.get(video.channelId) ?? null : null))
+    });
   } catch (err) {
     if (err instanceof YoutubeApiError) {
       return Response.json({ error: err.message }, { status: 400 });
