@@ -5,6 +5,16 @@ const dot = document.getElementById("dot");
 const serverText = document.getElementById("serverText");
 const body = document.getElementById("body");
 
+/* Adapt the panel to the OS theme (light/dark) and follow later flips. */
+const themeQuery = window.matchMedia("(prefers-color-scheme: light)");
+function applyTheme() {
+  const light = themeQuery.matches;
+  document.body.setAttribute("data-ns-theme", light ? "light" : "dark");
+  document.documentElement.style.colorScheme = light ? "light" : "dark";
+}
+themeQuery.addEventListener("change", applyTheme);
+applyTheme();
+
 function strip(label, value, cls = "") {
   const vcls = cls ? ` ${cls}` : "";
   return `<div class="ns-strip"><span class="k">${label}</span><span class="v${vcls}">${value}</span></div>`;

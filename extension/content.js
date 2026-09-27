@@ -26,7 +26,7 @@ const NS_TOKENS = `
 }
 :host([data-ns-theme="light"]) {
   color-scheme: light;
-  --ns-amber: #b97a00;
+  --ns-amber: #9a6300;
   --ns-cyan: #0d7a8f;
   --ns-bad: #c0392b;
   --ns-ink: #1d232b;
@@ -292,11 +292,27 @@ function lookupVideo(id) {
 
 /* ------------------------------ Host mounting ------------------------------ */
 
+const themeQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+
+function currentTheme() {
+  return themeQuery && themeQuery.matches ? "light" : "dark";
+}
+
+/* Repaint every mounted surface + pill when the OS theme flips. */
+function applyTheme() {
+  const t = currentTheme();
+  document.querySelectorAll("[data-ns-theme]").forEach((el) => el.setAttribute("data-ns-theme", t));
+}
+
+if (themeQuery && themeQuery.addEventListener) {
+  themeQuery.addEventListener("change", applyTheme);
+}
+
 const hosts = {};
 function mountHost(name, right, top) {
   if (hosts[name]) return hosts[name];
   const host = document.createElement("div");
-  host.setAttribute("data-ns-theme", "");
+  host.setAttribute("data-ns-theme", currentTheme());
   host.style.cssText = `position:fixed;right:${right}px;top:${top}px;z-index:999999;`;
   const shadow = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
@@ -567,7 +583,7 @@ function addPill(anchor, id) {
   badgedIds.add(id);
 
   const pill = document.createElement("div");
-  pill.setAttribute("data-ns-theme", "");
+  pill.setAttribute("data-ns-theme", currentTheme());
   pill.className = "ns-pill";
   const meter = document.createElement("span");
   meter.className = "ns-meter ns-meter--sm";
