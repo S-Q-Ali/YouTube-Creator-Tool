@@ -160,7 +160,7 @@ function api(path, opts) {
   });
 }
 
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showHover: true, showResearch: true, showCoach: true, dataMode: "line", tileLimit: 60 };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "line", tileLimit: 60 };
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
 
@@ -624,7 +624,7 @@ function fillLine(row, model) {
 
   while (line.firstChild) line.removeChild(line.firstChild);
   if (model.views != null && prefs.dataMode === "full") line.append(lineCell(NS_META.compact(model.views), "ns-line-v"));
-  if (model.durationSeconds) line.append(lineCell(NS_META.fmtDuration(model.durationSeconds), "ns-line-v ns-line-dur"));
+  if (model.durationSeconds) line.append(lineCell(fmtDur(model.durationSeconds), "ns-line-v ns-line-dur"));
   if (line.childNodes.length) line.append(lineSep());
   line.append(lineCell(NS_META.fmtVph(vph), model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel"));
   if (prefs.dataMode === "full" && model.vphDay != null) {
@@ -811,93 +811,6 @@ function scanThumbnails() {
     added++;
   }
   overlayRunning = false;
-}
-
-/* ------------------------- Hover stats bar / tooltip ------------------------- */
-
-let tipAnchor = null;
-let tipPending = null;
-
-function showTipFor(anchor, id) {
-  if (tipAnchor === anchor) return;
-  tipAnchor = anchor;
-
-  const shadow = mountHost("tip", 0, 0);
-  const rect = anchor.getBoundingClientRect();
-  shadow.root.innerHTML = `
-    <div class="ns-surface ns-tip ns-enter">
-      <div class="ns-skeleton"><span></span><span></span><span></span><span></span></div>
-    </div>`;
-  const tip = shadow.shadow.querySelector(".ns-tip");
-
-  const posX = Math.min(rect.left, window.innerWidth - 226);
-  const posY = rect.bottom + 8;
-  const flip = posY + tip.offsetHeight + 70 > window.innerHeight ? rect.top - tip.offsetHeight - 8 : posY;
-  shadow.host.style.left = `${Math.max(8, posX)}px`;
-  shadow.host.style.top = `${Math.max(8, flip)}px`;
-  shadow.host.style.right = "auto";
-
-  if (tipPending === id) return;
-  tipPending = id;
-  lookupVideo(id).then((data) => {
-    if (tipAnchor !== anchor) return;
-    tipPending = null;
-    if (!data || !data.seo) {
-      tip.innerHTML = '<p class="ns-note">No data for this video right now.</p>';
-      return;
-    }
-    const v = data.video;
-    const spike = data.vph && data.vph.vph != null && data.vph.vph >= 500;
-    const outlier = data.outlier != null && data.outlier >= 300;
-    const rows = [
-      `<div class="ns-strip"><span class="k">views</span><span class="v" data-n="${v.viewCount}">${fmtT(v.viewCount)}</span></div>`
-    ];
-    const ageDays = v.publishedAt ? Math.max(1, (Date.now() - new Date(v.publishedAt).getTime()) / 86_400_000) : null;
-    if (ageDays != null && v.viewCount > 0) {
-      rows.push(`<div class="ns-strip"><span class="k">views/day</span><span class="v ns-live" data-n="${Math.round(v.viewCount / ageDays)}">${fmtT(v.viewCount / ageDays)}</span></div>`);
-    }
-    if (v.likeCount != null) {
-      rows.push(`<div class="ns-strip"><span class="k">likes</span><span class="v">${fmtT(v.likeCount)}</span></div>`);
-    }
-    if (v.commentCount != null) {
-      rows.push(`<div class="ns-strip"><span class="k">comments</span><span class="v">${fmtT(v.commentCount)}</span></div>`);
-    }
-    if (v.viewCount > 0) {
-      if (v.likeCount != null) {
-        rows.push(`<div class="ns-strip"><span class="k">likes%</span><span class="v">${((v.likeCount / v.viewCount) * 100).toFixed(1)}</span></div>`);
-      }
-      if (v.commentCount != null) {
-        rows.push(`<div class="ns-strip"><span class="k">comments%</span><span class="v">${((v.commentCount / v.viewCount) * 100).toFixed(2)}</span></div>`);
-      }
-    }
-    if (data.vph && data.vph.vph != null) {
-      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${data.vph.vph}" data-s="/hr">${fmtT(data.vph.vph)}/hr</span></div>`);
-    }
-    const subs = data.channel && data.channel.subscriberCount;
-    if (subs != null && subs > 0 && v.viewCount > 0) {
-      rows.push(`<div class="ns-strip"><span class="k">reach</span><span class="v">${(v.viewCount / subs).toFixed(1)}× subs</span></div>`);
-    }
-    if (data.outlier != null) {
-      const delta = data.outlier - 100;
-      rows.push(`<div class="ns-strip"><span class="k">vs avg</span><span class="v ${delta >= 0 ? "ns-live" : "ns-time"}">${delta >= 0 ? "+" : ""}${delta}%</span></div>`);
-    }
-    rows.push(
-      `<div class="ns-strip"><span class="k">posted</span><span class="v ns-time">${fmtDate(v.publishedAt)}</span></div>`,
-      `<div class="ns-strip"><span class="k">duration</span><span class="v">${fmtDur(v.durationSeconds)}</span></div>`
-    );
-    let badges = "";
-    if (spike) badges += '<div class="ns-badge bt"><span class="bd"></span>trending</div>';
-    if (outlier) badges += '<div class="ns-badge bo"><span class="bd"></span>outlier</div>';
-    tip.innerHTML = `${badges ? `<div class="ns-badges">${badges}</div>` : ""}` +
-      `<div class="ns-strips">${rows.join("")}</div>`;
-    animateNums(tip);
-  });
-}
-
-function hideTip() {
-  tipAnchor = null;
-  tipPending = null;
-  removeHost("tip");
 }
 
 /* ------------------------- Search keyword panel ------------------------- */
@@ -1165,7 +1078,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     stripLines();
     scanTiles();
   }
-  if (!prefs.showHover) hideTip();
 });
 
 function stripLines() {
@@ -1187,20 +1099,6 @@ function init() {
   routeOverlays();
   scanThumbnails();
   scanTiles();
-
-  document.addEventListener("pointerover", (e) => {
-    if (!prefs.showHover) return;
-    const a = e.target.closest ? e.target.closest(THUMBNAIL_SELECTOR) : null;
-    if (!a) return;
-    const id = videoIdFromHref(a.getAttribute("href"));
-    if (id) showTipFor(a, id);
-  });
-  document.addEventListener("pointerout", (e) => {
-    if (!prefs.showHover) return;
-    if (!tipAnchor) return;
-    if (e.target.closest && e.target.closest(THUMBNAIL_SELECTOR)) return;
-    hideTip();
-  });
 
   observer = new MutationObserver(() => {
     clearTimeout(observer._t);

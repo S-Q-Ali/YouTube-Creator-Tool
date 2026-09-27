@@ -46,9 +46,10 @@ async function loadPrefs() {
   const p = res.data;
   document.getElementById("showCard").checked = !!p.showCard;
   document.getElementById("showPills").checked = !!p.showPills;
-  document.getElementById("showHover").checked = p.showHover !== false;
   document.getElementById("showResearch").checked = p.showResearch !== false;
   document.getElementById("showCoach").checked = p.showCoach !== false;
+  document.getElementById("dataMode").value = p.dataMode || "line";
+  document.getElementById("tileLimit").value = String(p.tileLimit || 60);
   document.getElementById("pillLimit").value = String(p.pillLimit || 24);
 }
 
@@ -58,9 +59,10 @@ function savePrefs() {
     prefs: {
       showCard: document.getElementById("showCard").checked,
       showPills: document.getElementById("showPills").checked,
-      showHover: document.getElementById("showHover").checked,
       showResearch: document.getElementById("showResearch").checked,
       showCoach: document.getElementById("showCoach").checked,
+      dataMode: document.getElementById("dataMode").value || "line",
+      tileLimit: Number(document.getElementById("tileLimit").value) || 60,
       pillLimit: Number(document.getElementById("pillLimit").value) || 24,
     },
   });
@@ -106,9 +108,10 @@ async function main() {
 
 document.getElementById("showCard").addEventListener("change", savePrefs);
 document.getElementById("showPills").addEventListener("change", savePrefs);
-document.getElementById("showHover").addEventListener("change", savePrefs);
 document.getElementById("showResearch").addEventListener("change", savePrefs);
 document.getElementById("showCoach").addEventListener("change", savePrefs);
+document.getElementById("dataMode").addEventListener("change", savePrefs);
+document.getElementById("tileLimit").addEventListener("change", savePrefs);
 document.getElementById("pillLimit").addEventListener("change", savePrefs);
 loadPrefs();
 

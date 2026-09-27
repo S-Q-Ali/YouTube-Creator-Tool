@@ -96,21 +96,9 @@
     return compact(vphDay) + "/day";
   }
 
-  /** mm:ss or h:mm:ss, the way a card shows a runtime. */
-  function fmtDuration(seconds) {
-    if (seconds == null || !isFinite(seconds) || seconds <= 0) return "";
-    const total = Math.round(seconds);
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return h > 0
-      ? h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0")
-      : m + ":" + String(s).padStart(2, "0");
-  }
-
   function round1(value) {
     return Math.round(value * 10) / 10;
   }
 
-  g.NS_META = { parse, velocity, fmtVph, fmtVphDay, fmtDuration, compact };
+  g.NS_META = { parse, velocity, fmtVph, fmtVphDay, compact };
 })(typeof globalThis !== "undefined" ? globalThis : window);

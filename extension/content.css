@@ -49,10 +49,3 @@
 .ns-line[data-show-dur="1"] .ns-line-dur {
   display: inline;
 }
-
-/* ------------------------- Hover stats bar / tooltip ------------------------- */
-
-.ns-tip {
-  max-height: 76vh;
-  overflow-y: auto;
-}
