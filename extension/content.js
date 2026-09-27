@@ -133,9 +133,17 @@ const NS_COMPONENTS = `
 .ns-skeleton { display: flex; flex-direction: column; gap: 6px; }
 .ns-skeleton span { display: block; height: 10px; background: var(--ns-tick); border-radius: 1px; }
 @keyframes ns-open { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes ns-glow {
+  0% { text-shadow: none; }
+  20% { text-shadow: 0 0 0 rgba(240, 165, 0, 0); }
+  40% { text-shadow: 0 0 18px rgba(240, 165, 0, 0.45); }
+  100% { text-shadow: 0 0 0 rgba(240, 165, 0, 0); }
+}
 .ns-enter { animation: ns-open var(--ns-motion) ease-out; }
+.ns-glow--live { animation: ns-glow 900ms var(--ns-motion) ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .ns-enter { animation: none; }
+  .ns-glow--live { animation: none; text-shadow: none; }
   .ns-meter .ns-seg { transition: none; }
 }`;
 
@@ -350,7 +358,7 @@ function renderCard(data) {
   ];
   if (vph != null) {
     rows.push(
-      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}" data-n="${vph}" data-s="/hr">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
+      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${vph}" data-s="/hr">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
     );
   }
   if (data.video.likeCount != null) {
@@ -669,7 +677,7 @@ function showTipFor(anchor, id) {
       }
     }
     if (data.vph && data.vph.vph != null) {
-      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}" data-n="${data.vph.vph}" data-s="/hr">${fmtT(data.vph.vph)}/hr</span></div>`);
+      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${data.vph.vph}" data-s="/hr">${fmtT(data.vph.vph)}/hr</span></div>`);
     }
     const subs = data.channel && data.channel.subscriberCount;
     if (subs != null && subs > 0 && v.viewCount > 0) {
