@@ -124,6 +124,14 @@
   padding: 0;
 }
 
+.ns-pill-grade {
+  margin-left: 4px;
+  font-family: var(--ns-font-read);
+  font-size: 10px;
+  font-variation-settings: "wght" var(--ns-w-read-strong);
+  color: var(--ns-ink);
+}
+
 /* ---------------------------------- Chip ----------------------------------- */
 
 .ns-chip {

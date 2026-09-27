@@ -721,11 +721,14 @@ function storeRow(id, data) {
     vphDay: data.velocity ? data.velocity.vphDay : null,
     views: data.viewCount,
     durationSeconds: data.durationSeconds,
+    score: data.score,
+    grade: data.grade,
     spike: !!data.spike
   };
   gridMem.set(id, model);
   if (gridMem.size > 400) gridMem.clear();
   applyModel(id, model);
+  paintChip(id, model);
 }
 
 function applyModel(id, model) {
@@ -742,6 +745,7 @@ function applyModel(id, model) {
 /* ------------------------- Thumbnail signal pills ------------------------- */
 
 const badgedIds = new Set();
+const chipsById = new Map();
 let overlayRunning = false;
 let scanCountLogged = false;
 
@@ -754,29 +758,36 @@ function addPill(anchor, id) {
   pill.className = "ns-pill";
   const meter = document.createElement("span");
   meter.className = "ns-meter ns-meter--sm";
+  meter.setAttribute("aria-hidden", "true");
   meter.innerHTML = segments(0, 8);
-  pill.appendChild(meter);
+  const grade = document.createElement("span");
+  grade.className = "ns-pill-grade";
   const sign = document.createElement("span");
   sign.className = "ns-pill-sign";
   sign.setAttribute("role", "status");
   sign.setAttribute("aria-hidden", "true");
+  pill.appendChild(meter);
+  pill.appendChild(grade);
   pill.appendChild(sign);
   anchor.style.position = "relative";
   anchor.appendChild(pill);
 
-  lookupVideo(id).then((data) => {
-    if (!data || !data.seo) {
-      meter.innerHTML = segments(0, 8);
-      return;
-    }
-    meter.innerHTML = segments(data.seo.total, 8);
-    meter.querySelectorAll(".ns-seg.on").forEach((seg) => {
-      seg.style.transitionDelay = "0ms";
-    });
-    const spike = data.vph && data.vph.vph != null && data.vph.vph >= 500;
-    const outlier = data.outlier != null && data.outlier >= 300;
-    sign.className = "ns-pill-sign" + (spike ? " on--trend" : "") + (outlier ? " on--outlier" : "");
+  chipsById.set(id, { meter, grade, sign });
+  if (gridMem.has(id)) paintChip(id, gridMem.get(id));
+  else queueUpgrade(id);
+}
+
+/* Verdict on the thumbnail, numbers on the line: the same batch row feeds
+   both, so a card never shows two different velocities. */
+function paintChip(id, model) {
+  const chip = chipsById.get(id);
+  if (!chip) return;
+  chip.meter.innerHTML = segments(model.score || 0, 8);
+  chip.meter.querySelectorAll(".ns-seg.on").forEach((seg) => {
+    seg.style.transitionDelay = "0ms";
   });
+  chip.grade.textContent = model.grade || "";
+  chip.sign.className = "ns-pill-sign" + (model.spike ? " on--trend" : "");
 }
 
 const THUMBNAIL_SELECTOR = 'a[href*="/watch"], a[href*="/shorts/"]';
