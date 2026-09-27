@@ -2,6 +2,7 @@ import { fetchChannels, fetchVideos, parseVideoInput, YoutubeApiError } from "@/
 import { computeSeoScore } from "@/lib/scorecard";
 import { computeVph } from "@/lib/vphEngine";
 import { computeVelocity } from "@/lib/velocity";
+import { channelAverageViews, outlierPercent } from "@/lib/outlier";
 import { isTracked } from "@/lib/tracking";
 import { all } from "@/lib/db";
 
@@ -61,7 +62,13 @@ export async function POST(request: Request) {
     const vph = computeVph(video.videoId);
     const velocity = computeVelocity({ viewCount: video.viewCount, publishedAt: video.publishedAt });
     const ctx = channel && video.channelId ? channelContext(video.channelId, video.videoId) : null;
-    const outlier = ctx && ctx.channelAvgViews > 0 ? Math.round((video.viewCount / ctx.channelAvgViews) * 100) : null;
+    // Prefer the average of videos we have actually stored for this channel; fall
+    // back to the channel's own lifetime average so the reading is never blank
+    // just because nobody tracked the channel.
+    const trackedOutlier = ctx && ctx.channelAvgViews > 0 ? Math.round((video.viewCount / ctx.channelAvgViews) * 100) : null;
+    const channelOutlier = outlierPercent(video.viewCount, channelAverageViews(channel));
+    const outlier = trackedOutlier ?? channelOutlier;
+    const outlierBasis = trackedOutlier != null ? "tracked" : channelOutlier != null ? "channel" : null;
 
     return Response.json({
       kind: "video",
@@ -73,6 +80,7 @@ export async function POST(request: Request) {
       vph,
       velocity,
       channelContext: ctx,
+      outlierBasis,
       outlier,
       tracked: isTracked("video", video.videoId),
     });

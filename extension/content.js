@@ -397,12 +397,15 @@ function renderCard(data) {
     rows.push(
       `<div class="ns-strip"><span class="k">ch avg</span><span class="v">${fmt(data.channelContext.channelAvgViews)}</span></div>`
     );
-    if (data.outlier != null) {
-      const outlier = data.outlier >= 300;
-      rows.push(
-        `<div class="ns-strip"><span class="k">vs avg</span><span class="v ${outlier ? "ns-live" : "ns-time"}">${fmtT(data.outlier)}%${outlier ? " outlier" : ""}</span></div>`
-      );
-    }
+  }
+  if (data.outlier != null) {
+    const hot = data.outlier >= 300;
+    // Say which average the number is against: videos we stored, or the
+    // channel's own lifetime record.
+    const basis = data.outlierBasis === "channel" ? "channel avg" : "avg";
+    rows.push(
+      `<div class="ns-strip"><span class="k">vs ${basis}</span><span class="v ${hot ? "ns-live" : "ns-time"}">${fmtT(data.outlier)}%${hot ? " outlier" : ""}</span></div>`
+    );
   }
   rows.push(`<div class="ns-strip"><span class="k">posted</span><span class="v ns-time">${fmtDate(data.video.publishedAt)}</span></div>`);
   if (data.channel) {
