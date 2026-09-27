@@ -24,6 +24,9 @@
   --ns-radius: 2px;
   --ns-motion: 140ms;
 
+  --ns-w-read: 600;
+  --ns-w-read-strong: 700;
+
   --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
@@ -112,7 +115,8 @@
   gap: 6px;
   font-family: var(--ns-font-read);
   font-size: 20px;
-  font-weight: 600;
+  font-weight: var(--ns-w-read);
+  font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
   color: var(--ns-ink);
 }
@@ -142,6 +146,8 @@
 .ns-strip .v {
   font-family: var(--ns-font-read);
   font-size: 13px;
+  font-weight: var(--ns-w-read);
+  font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
   color: var(--ns-ink);
   white-space: nowrap;
@@ -149,6 +155,7 @@
 
 .ns-strip .v.ns-live {
   color: var(--ns-amber);
+  font-variation-settings: "wght" var(--ns-w-read-strong);
 }
 
 .ns-strip .v.ns-time {

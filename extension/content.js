@@ -19,6 +19,8 @@ const NS_TOKENS = `
   --ns-tick: rgba(242, 245, 248, 0.18);
   --ns-radius: 2px;
   --ns-motion: 140ms;
+  --ns-w-read: 600;
+  --ns-w-read-strong: 700;
   --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
@@ -57,13 +59,15 @@ const NS_COMPONENTS = `
 .ns-meter--xs { height: 3px; padding: 0; }
 .ns-score { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .ns-reading { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ns-font-read);
-  font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ns-ink); }
+  font-size: 19px; font-weight: var(--ns-w-read); font-variation-settings: "wght" var(--ns-w-read);
+  font-variant-numeric: tabular-nums; color: var(--ns-ink); }
 .ns-strips { display: flex; flex-direction: column; gap: 8px; }
 .ns-strip { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0; }
 .ns-strip .k { font-size: 11.5px; color: var(--ns-mute); }
-.ns-strip .v { font-family: var(--ns-font-read); font-size: 12.5px; font-variant-numeric: tabular-nums;
+.ns-strip .v { font-family: var(--ns-font-read); font-size: 12.5px; font-weight: var(--ns-w-read);
+  font-variation-settings: "wght" var(--ns-w-read); font-variant-numeric: tabular-nums;
   color: var(--ns-ink); white-space: nowrap; }
-.ns-strip .v.ns-live { color: var(--ns-amber); }
+.ns-strip .v.ns-live { color: var(--ns-amber); font-variation-settings: "wght" var(--ns-w-read-strong); }
 .ns-strip .v.ns-time { color: var(--ns-cyan); }
 .ns-strip .v.ns-dead { color: var(--ns-bad); }
 .ns-chip { display: inline-block; font-family: var(--ns-font-read); font-weight: 600; font-size: 10px;
@@ -185,6 +189,34 @@ function fmt(n) {
 function fmtT(n) {
   if (n == null || isNaN(n)) return "—";
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function reducedMotion() {
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/* Count any [data-n] element up to its target once the subtree is mounted. */
+function animateNums(root) {
+  if (!root) return;
+  const reduce = reducedMotion();
+  root.querySelectorAll("[data-n]").forEach((el) => {
+    const target = parseFloat(el.dataset.n);
+    const suffix = el.dataset.s || "";
+    if (isNaN(target)) return;
+    if (reduce) {
+      el.textContent = fmtT(target) + suffix;
+      return;
+    }
+    const start = performance.now();
+    const dur = 420;
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtT(target * eased) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
 function fmtDate(iso) {
@@ -314,11 +346,11 @@ function renderCard(data) {
   const grade = gradeOf(total);
   const chip = total >= 60 ? "ns-chip--live" : total >= 40 ? "" : "ns-chip--dead";
   const rows = [
-    `<div class="ns-strip"><span class="k">views</span><span class="v">${fmtT(data.video.viewCount)}</span></div>`
+    `<div class="ns-strip"><span class="k">views</span><span class="v" data-n="${data.video.viewCount}">${fmtT(data.video.viewCount)}</span></div>`
   ];
   if (vph != null) {
     rows.push(
-      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
+      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}" data-n="${vph}" data-s="/hr">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
     );
   }
   if (data.video.likeCount != null) {
@@ -342,7 +374,7 @@ function renderCard(data) {
   s.innerHTML = `
     <div class="ns-score">
       <span class="ns-meter">${segments(total, 12)}</span>
-      <span class="ns-reading">${total}<span class="ns-chip ${chip}">${grade}</span></span>
+      <span class="ns-reading"><span data-n="${total}">${fmtT(total)}</span><span class="ns-chip ${chip}">${grade}</span></span>
     </div>
     <div class="ns-badges">${cardBadges(data)}</div>
     <div class="ns-strips">${rows.join("")}</div>
@@ -352,6 +384,7 @@ function renderCard(data) {
       ${prefs.showCoach ? '<button class="ns-btn" type="button" data-a="coach">Ask AI</button>' : ""}
     </div>
     <div class="ns-extras"></div>`;
+  animateNums(s);
   bindCardActions();
   if (cardState.tagsOpen) openTags();
   if (cardState.coachOpen) openCoach();
@@ -615,11 +648,11 @@ function showTipFor(anchor, id) {
     const spike = data.vph && data.vph.vph != null && data.vph.vph >= 500;
     const outlier = data.outlier != null && data.outlier >= 300;
     const rows = [
-      `<div class="ns-strip"><span class="k">views</span><span class="v">${fmtT(v.viewCount)}</span></div>`
+      `<div class="ns-strip"><span class="k">views</span><span class="v" data-n="${v.viewCount}">${fmtT(v.viewCount)}</span></div>`
     ];
     const ageDays = v.publishedAt ? Math.max(1, (Date.now() - new Date(v.publishedAt).getTime()) / 86_400_000) : null;
     if (ageDays != null && v.viewCount > 0) {
-      rows.push(`<div class="ns-strip"><span class="k">views/day</span><span class="v ns-live">${fmtT(v.viewCount / ageDays)}</span></div>`);
+      rows.push(`<div class="ns-strip"><span class="k">views/day</span><span class="v ns-live" data-n="${Math.round(v.viewCount / ageDays)}">${fmtT(v.viewCount / ageDays)}</span></div>`);
     }
     if (v.likeCount != null) {
       rows.push(`<div class="ns-strip"><span class="k">likes</span><span class="v">${fmtT(v.likeCount)}</span></div>`);
@@ -636,7 +669,7 @@ function showTipFor(anchor, id) {
       }
     }
     if (data.vph && data.vph.vph != null) {
-      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}">${fmtT(data.vph.vph)}/hr</span></div>`);
+      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}" data-n="${data.vph.vph}" data-s="/hr">${fmtT(data.vph.vph)}/hr</span></div>`);
     }
     const subs = data.channel && data.channel.subscriberCount;
     if (subs != null && subs > 0 && v.viewCount > 0) {
@@ -655,6 +688,7 @@ function showTipFor(anchor, id) {
     if (outlier) badges += '<div class="ns-badge bo"><span class="bd"></span>outlier</div>';
     tip.innerHTML = `${badges ? `<div class="ns-badges">${badges}</div>` : ""}` +
       `<div class="ns-strips">${rows.join("")}</div>`;
+    animateNums(tip);
   });
 }
 
