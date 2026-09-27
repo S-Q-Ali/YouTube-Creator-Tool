@@ -58,9 +58,8 @@ const NS_COMPONENTS = `
 .ns-score { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .ns-reading { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ns-font-read);
   font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ns-ink); }
-.ns-strips { display: flex; flex-direction: column; }
-.ns-strip { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; }
-.ns-strip + .ns-strip { border-top: 1px solid var(--ns-hair); }
+.ns-strips { display: flex; flex-direction: column; gap: 8px; }
+.ns-strip { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0; }
 .ns-strip .k { font-size: 11.5px; color: var(--ns-mute); }
 .ns-strip .v { font-family: var(--ns-font-read); font-size: 12.5px; font-variant-numeric: tabular-nums;
   color: var(--ns-ink); white-space: nowrap; }
