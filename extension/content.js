@@ -372,16 +372,22 @@ function renderCard(data) {
     return;
   }
   const total = data.seo.total;
-  const vph = data.vph && data.vph.vph != null ? data.vph.vph : null;
-  const spike = vph != null && vph >= 500;
+  const life = data.velocity && data.velocity.vph != null ? data.velocity.vph : null;
+  const trend = data.vph && data.vph.vph != null ? data.vph.vph : null;
+  const spike = life != null && life >= 500;
   const grade = gradeOf(total);
   const chip = total >= 60 ? "ns-chip--live" : total >= 40 ? "" : "ns-chip--dead";
   const rows = [
     `<div class="ns-strip"><span class="k">views</span><span class="v" data-n="${data.video.viewCount}">${fmtT(data.video.viewCount)}</span></div>`
   ];
-  if (vph != null) {
+  if (life != null) {
     rows.push(
-      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${vph}" data-s="/hr">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
+      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${life}" data-s="/hr">${fmtT(life)}/hr${spike ? " ↑" : ""}</span></div>`
+    );
+  }
+  if (trend != null) {
+    rows.push(
+      `<div class="ns-strip"><span class="k">24h trend</span><span class="v ns-time" data-n="${trend}" data-s="/hr">${fmtT(trend)}/hr</span></div>`
     );
   }
   if (data.video.likeCount != null) {
@@ -423,7 +429,8 @@ function renderCard(data) {
 
 function cardBadges(data) {
   const badges = [];
-  if (data.vph && data.vph.vph != null && data.vph.vph >= 500) {
+  const life = data.velocity && data.velocity.vph != null ? data.velocity.vph : null;
+  if (life != null && life >= 500) {
     badges.push('<span class="ns-badge bt"><span class="bd"></span>trending</span>');
   }
   if (data.outlier != null && data.outlier >= 300) {

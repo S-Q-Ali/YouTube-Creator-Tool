@@ -1,6 +1,7 @@
 import { fetchChannels, fetchVideos, parseVideoInput, YoutubeApiError } from "@/lib/youtubeClient";
 import { computeSeoScore } from "@/lib/scorecard";
 import { computeVph } from "@/lib/vphEngine";
+import { computeVelocity } from "@/lib/velocity";
 import { isTracked } from "@/lib/tracking";
 import { all } from "@/lib/db";
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       focusKeyword: body.focusKeyword?.trim() || undefined,
     });
     const vph = computeVph(video.videoId);
+    const velocity = computeVelocity({ viewCount: video.viewCount, publishedAt: video.publishedAt });
     const ctx = channel && video.channelId ? channelContext(video.channelId, video.videoId) : null;
     const outlier = ctx && ctx.channelAvgViews > 0 ? Math.round((video.viewCount / ctx.channelAvgViews) * 100) : null;
 
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
         : undefined,
       seo,
       vph,
+      velocity,
       channelContext: ctx,
       outlier,
       tracked: isTracked("video", video.videoId),
