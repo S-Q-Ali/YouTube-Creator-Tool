@@ -3,7 +3,7 @@
   "name": "Niche-Scope",
   "version": "0.3.0",
   "description": "Always-on SEO scores, letter grades and views-per-hour on every YouTube card, backed by your local Niche-Scope server.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "downloads"],
   "host_permissions": ["http://localhost:3000/*"],
   "background": {
     "service_worker": "background.js"
@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": ["*://www.youtube.com/*"],
-      "js": ["lib/nsMeta.js", "lib/lineModel.js", "content.js"],
+      "js": ["lib/nsMeta.js", "lib/lineModel.js", "lib/thumb.js", "content.js"],
       "css": ["ns-theme.css", "content.css"],
       "run_at": "document_idle"
     }

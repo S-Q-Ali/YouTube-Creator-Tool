@@ -49,3 +49,35 @@
 .ns-line[data-show-dur="1"] .ns-line-dur {
   display: inline;
 }
+
+/* The save-thumbnail row lives inside YouTube's own menu, so it borrows the
+   menu's layout and only lends it our ink and a focus ring. */
+.ns-thumb-item {
+  cursor: pointer;
+}
+
+.ns-thumb-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ns-mute);
+}
+
+.ns-thumb-item:hover .ns-thumb-icon {
+  color: var(--ns-ink);
+}
+
+.ns-thumb-item:focus-visible {
+  outline: 2px solid var(--ns-cyan);
+  outline-offset: -2px;
+}
+
+.ns-thumb-item--busy {
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-thumb-item {
+    transition: none;
+  }
+}

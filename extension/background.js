@@ -64,7 +64,65 @@ async function getPrefs() {
   return { ...DEFAULT_PREFS, ...(stored[PREFS_KEY] || {}) };
 }
 
+/* ----------------------- Thumbnail download ----------------------- */
+
+/*
+ * chrome.downloads fetches cross-origin for us: no CORS preflight, no host
+ * permission, and a wrong-size guess (maxres on an old video) comes back as an
+ * interrupted download rather than a thrown error, so the next candidate is
+ * simply tried.
+ */
+let thumbAttempt = null;
+
+function downloadThumbnail(urls, filename) {
+  return new Promise((resolve) => {
+    if (!Array.isArray(urls) || urls.length === 0) {
+      resolve({ ok: false, error: "No image to download" });
+      return;
+    }
+    let index = 0;
+
+    const attemptNext = (reason) => {
+      if (thumbAttempt) {
+        chrome.downloads.onChanged.removeListener(thumbAttempt.listener);
+        thumbAttempt = null;
+      }
+      if (index >= urls.length) {
+        resolve({ ok: false, error: reason || "Every image size failed" });
+        return;
+      }
+      const url = urls[index++];
+      chrome.downloads.download({ url, filename, saveAs: false, conflictAction: "uniquify" }, (downloadId) => {
+        if (chrome.runtime.lastError || downloadId == null) {
+          attemptNext(chrome.runtime.lastError ? chrome.runtime.lastError.message : "Download refused");
+          return;
+        }
+        const listener = (delta) => {
+          if (!delta || delta.id !== downloadId || !delta.state || !delta.state.current) return;
+          if (delta.state.current === "complete") {
+            if (thumbAttempt) chrome.downloads.onChanged.removeListener(thumbAttempt.listener);
+            thumbAttempt = null;
+            resolve({ ok: true, url });
+          } else if (delta.state.current === "interrupted") {
+            attemptNext("Every image size failed");
+          }
+        };
+        thumbAttempt = { listener };
+        chrome.downloads.onChanged.addListener(listener);
+      });
+    };
+
+    attemptNext(null);
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "thumb:download") {
+    downloadThumbnail(msg.urls, msg.filename)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse({ ok: false, error: String((err && err.message) || err) }));
+    return true;
+  }
   if (msg && msg.type === "api") {
     apiFetch(msg.path, msg.opts)
       .then((data) => sendResponse({ ok: true, data }))

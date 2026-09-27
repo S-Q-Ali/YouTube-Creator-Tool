@@ -369,6 +369,7 @@ function renderCard(data) {
       '<p class="ns-note">No score for this video. Make sure Niche-Scope is running (npm run dev) and the video is public.</p>';
     return;
   }
+  rememberWatchVideo(data);
   const total = data.seo.total;
   const life = data.velocity && data.velocity.vph != null ? data.velocity.vph : null;
   const trend = data.vph && data.vph.vph != null ? data.vph.vph : null;
@@ -583,8 +584,140 @@ function showWatchCard(videoId) {
   buildCard();
   cardState.videoId = videoId;
   const s = cardBody();
-  if (s) s.innerHTML = '<p class="ns-note">Loading…</p>';
+  if (s) s.innerHTML = '<p class="ns-note">Loading.</p>';
   lookupVideo(videoId).then((data) => renderCard(data));
+}
+
+/* --------------------- Watch menu: save this thumbnail --------------------- */
+
+/*
+ * The download row is placed inside YouTube's own menu, directly under the
+ * "Audio and captions" row, by cloning that row so the styling is the site's
+ * and not ours. Nothing here assumes a specific build of the menu: if the row
+ * is not found the item simply does not appear.
+ */
+const THUMB_LABEL = "Download thumbnail";
+const THUMB_ITEM_CLASS = "ns-thumb-item";
+const THUMB_ICON_SVG =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M12 3v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>';
+
+let watchThumb = { id: null, title: "", thumbnailUrl: "" };
+let thumbLabel = null;
+let thumbObserver = null;
+
+function rememberWatchVideo(data) {
+  if (!data || !data.video) return;
+  watchThumb = {
+    id: data.video.videoId,
+    title: data.video.title || "",
+    thumbnailUrl: data.video.thumbnailUrl || ""
+  };
+}
+
+function thumbItem() {
+  return document.querySelector("." + THUMB_ITEM_CLASS);
+}
+
+function removeThumbItem() {
+  const item = thumbItem();
+  if (item && item.parentNode) item.parentNode.removeChild(item);
+  thumbLabel = null;
+}
+
+function setThumbState(text) {
+  if (!thumbLabel) return;
+  thumbLabel.textContent = text || THUMB_LABEL;
+  const item = thumbLabel.closest("." + THUMB_ITEM_CLASS);
+  if (item) item.classList.toggle("ns-thumb-item--busy", !!text);
+}
+
+function downloadWatchThumb() {
+  const id = watchThumb.id || currentVideoId();
+  const filename = NS_THUMB.filename(watchThumb.title, id);
+  const urls = NS_THUMB.candidates(id, watchThumb.thumbnailUrl);
+  if (!filename || urls.length === 0) return;
+  setThumbState("Saving...");
+  chrome.runtime.sendMessage({ type: "thumb:download", urls, filename }, (res) => {
+    if (chrome.runtime.lastError || !res || !res.ok) {
+      console.warn("[niche-scope] thumbnail download failed:", (res && res.error) || chrome.runtime.lastError);
+      setThumbState("Could not save");
+    } else {
+      setThumbState("Saved");
+    }
+    setTimeout(() => setThumbState(null), 2600);
+  });
+}
+
+function findAudioCaptionsRow() {
+  const rows = Array.from(
+    document.querySelectorAll("ytd-menu-service-item-renderer, ytd-menu-navigation-item-renderer, tp-yt-paper-item")
+  );
+  const index = NS_THUMB.audioCaptionsIndex(rows.map((row) => row.textContent));
+  return index === -1 ? null : rows[index];
+}
+
+function buildThumbItem(anchor) {
+  const item = anchor.cloneNode(true);
+  item.classList.add(THUMB_ITEM_CLASS);
+  item.classList.remove("ns-thumb-item--busy");
+  item.removeAttribute("id");
+  item.removeAttribute("aria-checked");
+  item.setAttribute("aria-label", THUMB_LABEL);
+  item.querySelectorAll("yt-icon, .dropdown-icon, #icon, .ns-thumb-icon").forEach((icon) => icon.remove());
+
+  const labels = item.querySelectorAll(".dropdown-title, .yt-core-attributed-string");
+  if (labels.length === 0) return null;
+  thumbLabel = labels[0];
+  thumbLabel.textContent = THUMB_LABEL;
+  for (let i = 1; i < labels.length; i++) labels[i].remove();
+
+  const icon = document.createElement("span");
+  icon.className = "ns-thumb-icon";
+  icon.innerHTML = THUMB_ICON_SVG;
+  item.insertBefore(icon, item.firstChild);
+
+  const run = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    downloadWatchThumb();
+  };
+  item.addEventListener("click", run, true);
+  item.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") run(event);
+  }, true);
+  return item;
+}
+
+function ensureThumbItem() {
+  if (currentVideoId() == null) {
+    removeThumbItem();
+    return;
+  }
+  if (thumbItem()) return;
+  const anchor = findAudioCaptionsRow();
+  if (!anchor || !anchor.parentNode) return;
+  const item = buildThumbItem(anchor);
+  if (item) anchor.parentNode.insertBefore(item, anchor.nextSibling);
+}
+
+function watchThumbMenu() {
+  if (currentVideoId() == null) {
+    if (thumbObserver) {
+      thumbObserver.disconnect();
+      thumbObserver = null;
+    }
+    removeThumbItem();
+    return;
+  }
+  if (thumbObserver) return;
+  ensureThumbItem();
+  thumbObserver = new MutationObserver(() => {
+    if (thumbItem()) return;
+    clearTimeout(thumbObserver._t);
+    thumbObserver._t = setTimeout(ensureThumbItem, 60);
+  });
+  thumbObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 /* ------------------------- Always-on grid data line ------------------------- */
@@ -1094,6 +1227,7 @@ function routeOverlays() {
       removeHost("channel");
       if (prefs.showCard) showWatchCard(loc.id);
       else removeHost("card");
+      watchThumbMenu();
       break;
     case "results":
       removeHost("card");
@@ -1166,6 +1300,8 @@ function watchUrl() {
     lastHref = location.href;
     routeOverlays();
     scanThumbnails();
+    // A new video is a new title to name the file after.
+    watchThumb = { id: currentVideoId(), title: watchThumb.title, thumbnailUrl: "" };
   }
   requestAnimationFrame(watchUrl);
 }
