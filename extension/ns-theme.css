@@ -1,0 +1,175 @@
+/* Niche-Scope Shared Theme ("Transmission") — canonical tokens + components.
+ * Shadow-DOM surfaces mirror these tokens via NS_TOKENS in content.js — keep in sync.
+ * Every root element carries data-ns-theme so tokens never leak onto the host page. */
+
+[data-ns-theme] {
+  --ns-soot: #12161c;
+  --ns-lift: #1b222b;
+  --ns-ink: #f2f5f8;
+  --ns-mute: #8a94a3;
+  --ns-amber: #f0a500;
+  --ns-cyan: #3cc8de;
+  --ns-bad: #e4574f;
+  --ns-glass: rgba(18, 22, 28, 0.85);
+  --ns-hair: rgba(242, 245, 248, 0.12);
+  --ns-tick: rgba(242, 245, 248, 0.22);
+
+  --ns-radius: 2px;
+  --ns-motion: 140ms;
+
+  --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+/* ------------------------------- Signal meter ------------------------------ */
+
+.ns-meter {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  height: 6px;
+  padding: 1px;
+  background: var(--ns-hair);
+  border-radius: var(--ns-radius);
+}
+
+.ns-meter .ns-seg {
+  flex: 1 1 0;
+  min-width: 2px;
+  background: var(--ns-tick);
+  border-radius: 1px;
+  transition: background var(--ns-motion) ease-out;
+}
+
+.ns-meter .ns-seg.on {
+  background: var(--ns-amber);
+}
+
+.ns-meter .ns-seg.on--time {
+  background: var(--ns-cyan);
+}
+
+.ns-meter--sm {
+  height: 4px;
+  padding: 0;
+}
+
+/* ---------------------------------- Chip ----------------------------------- */
+
+.ns-chip {
+  display: inline-block;
+  font-family: var(--ns-font-read);
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 1.25;
+  padding: 1px 5px 1px 7px;
+  border: 1px solid var(--ns-mute);
+  border-radius: 999px 2px 2px 999px;
+  color: var(--ns-mute);
+}
+
+.ns-chip--live {
+  border-color: var(--ns-amber);
+  color: var(--ns-amber);
+}
+
+.ns-chip--dead {
+  border-color: var(--ns-bad);
+  color: var(--ns-bad);
+}
+
+/* --------------------------------- Reading --------------------------------- */
+
+.ns-reading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--ns-font-read);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ns-ink);
+}
+
+/* ---------------------------------- Strips --------------------------------- */
+
+.ns-strips {
+  display: flex;
+  flex-direction: column;
+}
+
+.ns-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ns-strip + .ns-strip {
+  border-top: 1px solid var(--ns-hair);
+}
+
+.ns-strip .k {
+  font-family: var(--ns-font-ui);
+  font-size: 12px;
+  color: var(--ns-mute);
+}
+
+.ns-strip .v {
+  font-family: var(--ns-font-read);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ns-ink);
+  white-space: nowrap;
+}
+
+.ns-strip .v.ns-live {
+  color: var(--ns-amber);
+}
+
+.ns-strip .v.ns-time {
+  color: var(--ns-cyan);
+}
+
+.ns-strip .v.ns-dead {
+  color: var(--ns-bad);
+}
+
+/* ---------------------------------- Panel ---------------------------------- */
+
+.ns-panel {
+  background: var(--ns-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ns-hair);
+  border-radius: 0;
+  color: var(--ns-ink);
+  font-family: var(--ns-font-ui);
+}
+
+/* --------------------------------- Motion ---------------------------------- */
+
+@keyframes ns-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ns-enter {
+  animation: ns-enter var(--ns-motion) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-enter {
+    animation: none;
+  }
+  .ns-meter .ns-seg {
+    transition: none;
+  }
+}

@@ -1,6 +1,125 @@
-/* Niche-Scope content script: overlays SEO scores on YouTube.
+/* Niche-Scope content script: SEO scores + research overlays on YouTube.
  * Fetches happen in the background worker (avoids page CORS).
- */
+ * Surfaces: watch-page card (score + tags + AI coach), thumbnail hover data +
+ * signal pills, search-page keyword panel, channel research card. */
+
+/* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
+const NS_TOKENS = `
+:host {
+  --ns-amber: #f0a500;
+  --ns-cyan: #3cc8de;
+  --ns-bad: #e4574f;
+  --ns-ink: #f2f5f8;
+  --ns-mute: #8a94a3;
+  --ns-lift: #1b222b;
+  --ns-glass: rgba(18, 22, 28, 0.85);
+  --ns-hair: rgba(242, 245, 248, 0.12);
+  --ns-tick: rgba(242, 245, 248, 0.22);
+  --ns-radius: 2px;
+  --ns-motion: 140ms;
+  --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}`;
+
+const NS_COMPONENTS = `
+.ns-surface { background: var(--ns-glass); -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px); border: 1px solid var(--ns-hair); border-radius: 0;
+  color: var(--ns-ink); font-family: var(--ns-font-ui); }
+.ns-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ns-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ns-amber); flex: none; }
+.ns-head h1 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: normal; text-transform: none;
+  color: var(--ns-ink); flex: 1; }
+.ns-head .close { cursor: pointer; border: 0; background: none; font-size: 14px; color: var(--ns-mute);
+  line-height: 1; padding: 2px 3px; }
+.ns-head .close:hover { color: var(--ns-ink); }
+.ns-meter { display: flex; align-items: stretch; gap: 1px; height: 6px; padding: 1px;
+  background: var(--ns-hair); border-radius: var(--ns-radius); }
+.ns-meter .ns-seg { flex: 1 1 0; min-width: 2px; background: var(--ns-tick); border-radius: 1px;
+  transition: background var(--ns-motion) ease-out; }
+.ns-meter .ns-seg.on { background: var(--ns-amber); }
+.ns-meter .ns-seg.on--time { background: var(--ns-cyan); }
+.ns-meter--sm { height: 4px; padding: 0; }
+.ns-meter--xs { height: 3px; padding: 0; }
+.ns-score { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ns-reading { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ns-font-read);
+  font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ns-ink); }
+.ns-strips { display: flex; flex-direction: column; }
+.ns-strip { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.ns-strip + .ns-strip { border-top: 1px solid var(--ns-hair); }
+.ns-strip .k { font-size: 11.5px; color: var(--ns-mute); }
+.ns-strip .v { font-family: var(--ns-font-read); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: var(--ns-ink); white-space: nowrap; }
+.ns-strip .v.ns-live { color: var(--ns-amber); }
+.ns-strip .v.ns-time { color: var(--ns-cyan); }
+.ns-strip .v.ns-dead { color: var(--ns-bad); }
+.ns-chip { display: inline-block; font-family: var(--ns-font-read); font-weight: 600; font-size: 10px;
+  line-height: 1.25; padding: 1px 5px 1px 7px; border: 1px solid var(--ns-mute);
+  border-radius: 999px 2px 2px 999px; color: var(--ns-mute); }
+.ns-chip--live { border-color: var(--ns-amber); color: var(--ns-amber); }
+.ns-chip--dead { border-color: var(--ns-bad); color: var(--ns-bad); }
+.ns-btn { font-family: var(--ns-font-ui); font-size: 12px; line-height: 1; color: var(--ns-ink);
+  background: var(--ns-lift); border: 1px solid var(--ns-hair); border-radius: var(--ns-radius);
+  padding: 5px 9px; cursor: pointer; }
+.ns-btn:hover { border-color: var(--ns-amber); color: var(--ns-amber); }
+.ns-btn:disabled { opacity: 0.5; cursor: default; border-color: var(--ns-hair); color: var(--ns-mute); }
+.ns-actions { display: flex; gap: 6px; margin-top: 8px; }
+.ns-foot { margin: 8px 0 0; font-size: 11px; color: var(--ns-mute); }
+.ns-note { margin: 0; font-size: 11.5px; color: var(--ns-mute); line-height: 1.55; }
+.ns-note--bad { color: var(--ns-bad); }
+.ns-tags { margin-top: 10px; border-top: 1px solid var(--ns-hair); padding-top: 8px; }
+.ns-taghead { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.ns-taghead b { font-weight: 600; font-size: 11.5px; color: var(--ns-ink); }
+.ns-taghead span { font-size: 11px; color: var(--ns-mute); }
+.ns-tagwrap { display: flex; flex-wrap: wrap; gap: 4px; }
+.ns-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ns-ink);
+  background: var(--ns-lift); border: 1px solid var(--ns-hair); border-radius: var(--ns-radius);
+  padding: 2px 6px; cursor: copy; }
+.ns-tag:hover { border-color: var(--ns-amber); }
+.ns-tag .ns-tagscore { font-family: var(--ns-font-read); font-size: 10px; color: var(--ns-mute);
+  font-variant-numeric: tabular-nums; }
+.ns-tag.ns-add { border-color: var(--ns-cyan); color: var(--ns-cyan); }
+.ns-tag.ns-add .ns-tagscore { color: var(--ns-cyan); }
+.ns-coach { margin-top: 10px; border-top: 1px solid var(--ns-hair); padding-top: 8px; }
+.ns-coach-q { display: flex; gap: 6px; }
+.ns-coach textarea { flex: 1; background: var(--ns-lift); color: var(--ns-ink); border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius); padding: 6px 8px; font-family: var(--ns-font-ui); font-size: 12px;
+  resize: vertical; min-height: 40px; }
+.ns-coach textarea::placeholder { color: var(--ns-mute); }
+.ns-coach textarea:focus { outline: none; border-color: var(--ns-amber); }
+.ns-answer { margin: 8px 0 0; white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: var(--ns-ink);
+  max-height: 260px; overflow: auto; }
+.ns-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 3px 0; }
+.ns-row .t { font-size: 11.5px; color: var(--ns-mute); }
+.ns-row .m { width: 84px; }
+.ns-row .n { font-family: var(--ns-font-read); font-size: 12px; font-variant-numeric: tabular-nums;
+  color: var(--ns-ink); width: 28px; text-align: right; }
+.ns-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
+.ns-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ns-ink);
+  border: 1px solid var(--ns-hair); border-radius: 999px; padding: 2px 8px; }
+.ns-badge .bd { width: 5px; height: 5px; border-radius: 50%; }
+.ns-badge.bt .bd { background: var(--ns-amber); }
+.ns-badge.bo .bd { background: var(--ns-cyan); }
+.ns-list { margin-top: 6px; }
+.ns-item { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; text-decoration: none; }
+.ns-item + .ns-item { border-top: 1px solid var(--ns-hair); }
+.ns-item:hover .ns-item-title { color: var(--ns-amber); }
+.ns-item-title { font-size: 11.5px; line-height: 1.4; color: var(--ns-ink); flex: 1; }
+.ns-item .ns-item-v { font-family: var(--ns-font-read); font-size: 11px; color: var(--ns-mute);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ns-section-title { font-size: 11.5px; color: var(--ns-mute); margin: 10px 0 4px; }
+.ns-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ns-chipbtn { font-size: 11px; color: var(--ns-cyan); background: var(--ns-lift); border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius); padding: 2px 6px; cursor: pointer; }
+.ns-chipbtn:hover { border-color: var(--ns-cyan); }
+.ns-chipbtn.ns-q { color: var(--ns-ink); }
+.ns-skeleton { display: flex; flex-direction: column; gap: 6px; }
+.ns-skeleton span { display: block; height: 10px; background: var(--ns-tick); border-radius: 1px; }
+@keyframes ns-open { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.ns-enter { animation: ns-open var(--ns-motion) ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ns-enter { animation: none; }
+  .ns-meter .ns-seg { transition: none; }
+}`;
 
 function api(path, opts) {
   return new Promise((resolve) => {
@@ -8,7 +127,7 @@ function api(path, opts) {
   });
 }
 
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24 };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showHover: true, showResearch: true, showCoach: true };
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
 
@@ -16,26 +135,11 @@ function ensurePrefs() {
   chrome.runtime.sendMessage({ type: "prefs:get" }, (res) => {
     if (res && res.ok && res.data) {
       prefs = { ...DEFAULT_PREFS, ...res.data };
-      route();
+      routeOverlays();
       scanThumbnails();
     }
   });
 }
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes[PREFS_KEY]) return;
-  prefs = { ...DEFAULT_PREFS, ...(changes[PREFS_KEY].newValue || {}) };
-  if (!prefs.showCard && cardRoot) {
-    cardRoot.innerHTML =
-      '<div class="ns"><h1>Niche-Scope</h1><div class="ns-body"><p class="off">Overlay hidden in popup settings.</p></div></div>';
-  } else if (prefs.showCard && currentVideoId()) {
-    showWatchCard(currentVideoId());
-  }
-  if (prefs.showPills) {
-    badgedIds.clear();
-    scanThumbnails();
-  }
-});
 
 function videoIdFromHref(href) {
   try {
@@ -48,7 +152,7 @@ function videoIdFromHref(href) {
   }
 }
 
-function grade(score) {
+function gradeOf(score) {
   if (score >= 90) return "A";
   if (score >= 80) return "B";
   if (score >= 70) return "C";
@@ -64,135 +168,394 @@ function fmt(n) {
   return String(n);
 }
 
-/* ------------------------- Watch-page floating card ------------------------- */
-
-let cardHost = null;
-let cardRoot = null;
-
-function buildCard() {
-  if (cardHost) return;
-  cardHost = document.createElement("div");
-  cardHost.style.cssText =
-    "position:fixed;right:16px;top:64px;z-index:999999;font-family:-apple-system,Segoe UI,Roboto,sans-serif;";
-  const shadow = cardHost.attachShadow({ mode: "open" });
-  cardRoot = shadow;
-  const style = document.createElement("style");
-  style.textContent = `
-    .ns { width: 220px; background:#fff; border:1px solid #e4e4e4; border-radius:12px;
-          box-shadow:0 8px 24px rgba(0,0,0,.12); padding:12px 14px; color:#0f0f0f; }
-    .ns h1 { margin:0 0 8px; font-size:12px; font-weight:700; letter-spacing:.02em;
-             text-transform:uppercase; color:#8a8a8a; display:flex; justify-content:space-between; align-items:center; }
-    .ns .close { cursor:pointer; border:0; background:none; font-size:14px; color:#8a8a8a; line-height:1; padding:2px; }
-    .ns .row { display:flex; align-items:center; gap:10px; margin:6px 0; }
-    .ns .score { width:46px; height:46px; border-radius:50%; display:flex; flex-direction:column;
-                 align-items:center; justify-content:center; color:#fff; font-weight:800; }
-    .ns .score b { font-size:17px; line-height:1; }
-    .ns .score span { font-size:9px; opacity:.9; margin-top:2px; }
-    .ns .meta { font-size:12px; line-height:1.5; }
-    .ns .meta b { font-size:14px; }
-    .ns .pill { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px;
-                border-radius:999px; margin-top:6px; }
-    .ns .err { font-size:12px; color:#b91c1c; line-height:1.5; }
-    .ns .off { font-size:12px; color:#6b7280; line-height:1.5; }
-    .ns a { display:block; margin-top:10px; font-size:11px; color:#2563eb; text-decoration:none; }
-  `;
-  shadow.appendChild(style);
-  document.body.appendChild(cardHost);
+function fmtT(n) {
+  if (n == null || isNaN(n)) return "—";
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
-function scoreColor(score) {
-  if (score >= 80) return "#16a34a";
-  if (score >= 60) return "#65a30d";
-  if (score >= 40) return "#eab308";
-  if (score >= 25) return "#f97316";
-  return "#dc2626";
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function fmtDur(secs) {
+  if (secs == null || isNaN(secs)) return "—";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  if (m >= 60) return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+}
+
+function on(str) {
+  return /^[A-Za-z0-9]+$/.test(str) ? str : "";
+}
+
+/** Segmented signal meter: `count` segments, `score/100` filled. time = cyan fill. */
+function segments(score, count, time) {
+  const filled = Math.max(0, Math.min(count, Math.round((score / 100) * count)));
+  let s = "";
+  for (let i = 0; i < count; i++) {
+    const onCls = i < filled ? " on" : "";
+    const timeCls = i < filled && time ? " on--time" : onCls;
+    const delay = i < filled ? ` style="transition-delay:${i * 14}ms"` : "";
+    s += `<span class="ns-seg${timeCls}"${delay}></span>`;
+  }
+  return s;
+}
+
+/** Thin meter row: label + meter + reading. */
+function meterRow(label, score, time) {
+  if (score == null) {
+    return `<div class="ns-row"><span class="t">${label}</span><span class="n">—</span></div>`;
+  }
+  return `<div class="ns-row"><span class="t">${label}</span><span class="m">${segments(score, 8, time)}</span>` +
+    `<span class="n">${score}</span></div>`;
+}
+
+/* ------------------------------ Shared data cache ------------------------------ */
+
+const lookupMem = new Map();
+function lookupVideo(id) {
+  if (!lookupMem.has(id)) {
+    lookupMem.set(
+      id,
+      api("/api/videos/lookup", { method: "POST", body: { url: id } }).then((res) =>
+        res && res.ok && res.data ? res.data : null
+      )
+    );
+    if (lookupMem.size > 300) lookupMem.clear();
+  }
+  return lookupMem.get(id);
+}
+
+/* ------------------------------ Host mounting ------------------------------ */
+
+const hosts = {};
+function mountHost(name, right, top) {
+  if (hosts[name]) return hosts[name];
+  const host = document.createElement("div");
+  host.setAttribute("data-ns-theme", "");
+  host.style.cssText = `position:fixed;right:${right}px;top:${top}px;z-index:999999;`;
+  const shadow = host.attachShadow({ mode: "open" });
+  const style = document.createElement("style");
+  style.textContent = NS_TOKENS + NS_COMPONENTS;
+  const root = document.createElement("div");
+  shadow.appendChild(style);
+  shadow.appendChild(root);
+  document.body.appendChild(host);
+  hosts[name] = { host, shadow, root };
+  return hosts[name];
+}
+
+function removeHost(name) {
+  const h = hosts[name];
+  if (h) {
+    h.host.remove();
+    delete hosts[name];
+  }
+}
+
+/* ------------------------- Watch-page floating card ------------------------- */
+
+let cardState = { videoId: null, tagsOpen: false, tags: null, coachOpen: false };
+
+function buildCard() {
+  const m = mountHost("card", 16, 64);
+  if (!m.root.querySelector(".ns-card")) {
+    m.root.innerHTML =
+      '<div class="ns-card ns-surface ns-enter"><div class="ns-head"><span class="dot"></span><h1>Niche-Scope</h1>' +
+      '<button class="close" type="button">×</button></div><div class="ns-body"><p class="ns-note">Loading…</p></div></div>';
+    m.shadow.querySelector(".close").addEventListener("click", () => {
+      removeHost("card");
+      cardState = { videoId: null, tagsOpen: false, tags: null, coachOpen: false };
+    });
+  }
+  return m;
+}
+
+function cardBody() {
+  const m = hosts.card;
+  return m ? m.shadow.querySelector(".ns-body") : null;
 }
 
 function renderCard(data) {
-  const s = cardRoot.querySelector(".ns-body");
+  const s = cardBody();
+  if (!s) return;
   if (!data || !data.seo) {
     s.innerHTML =
-      '<p class="off">No score for this video. Make sure Niche-Scope is running (npm run dev) and the video is public.</p>';
+      '<p class="ns-note">No score for this video. Make sure Niche-Scope is running (npm run dev) and the video is public.</p>';
     return;
   }
   const total = data.seo.total;
-  const color = scoreColor(total);
   const vph = data.vph && data.vph.vph != null ? data.vph.vph : null;
+  const spike = vph != null && vph >= 500;
+  const grade = gradeOf(total);
+  const chip = total >= 60 ? "ns-chip--live" : total >= 40 ? "" : "ns-chip--dead";
+  const rows = [
+    `<div class="ns-strip"><span class="k">views</span><span class="v">${fmtT(data.video.viewCount)}</span></div>`
+  ];
+  if (vph != null) {
+    rows.push(
+      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}">${fmtT(vph)}/hr${spike ? " ↑" : ""}</span></div>`
+    );
+  }
+  if (data.video.likeCount != null) {
+    rows.push(`<div class="ns-strip"><span class="k">likes</span><span class="v">${fmt(data.video.likeCount)}</span></div>`);
+  }
+  if (data.channelContext && data.channelContext.watchedVideos > 0) {
+    rows.push(
+      `<div class="ns-strip"><span class="k">ch avg</span><span class="v">${fmt(data.channelContext.channelAvgViews)}</span></div>`
+    );
+    if (data.outlier != null) {
+      const outlier = data.outlier >= 300;
+      rows.push(
+        `<div class="ns-strip"><span class="k">vs avg</span><span class="v ${outlier ? "ns-live" : "ns-time"}">${fmtT(data.outlier)}%${outlier ? " outlier" : ""}</span></div>`
+      );
+    }
+  }
+  rows.push(`<div class="ns-strip"><span class="k">posted</span><span class="v ns-time">${fmtDate(data.video.publishedAt)}</span></div>`);
+  if (data.channel) {
+    rows.push(`<div class="ns-strip"><span class="k">channel</span><span class="v">${fmt(data.channel.subscriberCount)} subs</span></div>`);
+  }
   s.innerHTML = `
-    <div class="row">
-      <div class="score" style="background:${color}"><b>${total}</b><span>${grade(total)}</span></div>
-      <div class="meta">
-        <b>${fmt(data.video.viewCount)}</b> views<br>
-        ${data.channel ? fmt(data.channel.subscriberCount) + " subs" : ""}
-        ${vph != null ? `<div class="pill" style="background:#0f172a;color:#fff">${vph}/hr</div>` : ""}
-      </div>
+    <div class="ns-score">
+      <span class="ns-meter">${segments(total, 12)}</span>
+      <span class="ns-reading">${total}<span class="ns-chip ${chip}">${grade}</span></span>
     </div>
-    <p class="off">Actionable ${data.seo.actionablePct}% · Performance ${data.seo.performancePct}%</p>`;
+    <div class="ns-badges">${cardBadges(data)}</div>
+    <div class="ns-strips">${rows.join("")}</div>
+    <p class="ns-foot">actionable ${data.seo.actionablePct}%, performance ${data.seo.performancePct}%</p>
+    <div class="ns-actions">
+      <button class="ns-btn" type="button" data-a="tags">Tags</button>
+      ${prefs.showCoach ? '<button class="ns-btn" type="button" data-a="coach">Ask AI</button>' : ""}
+    </div>
+    <div class="ns-extras"></div>`;
+  bindCardActions();
+  if (cardState.tagsOpen) openTags();
+  if (cardState.coachOpen) openCoach();
+}
+
+function cardBadges(data) {
+  const badges = [];
+  if (data.vph && data.vph.vph != null && data.vph.vph >= 500) {
+    badges.push('<span class="ns-badge bt"><span class="bd"></span>trending</span>');
+  }
+  if (data.outlier != null && data.outlier >= 300) {
+    badges.push(`<span class="ns-badge bo"><span class="bd"></span>${fmtT(data.outlier)}% of avg</span>`);
+  }
+  return badges.join("");
+}
+
+function bindCardActions() {
+  const s = cardBody();
+  if (!s) return;
+  s.querySelectorAll(".ns-btn[data-a]").forEach((btn) => {
+    btn.onclick = () => {
+      if (btn.dataset.a === "tags") {
+        cardState.tagsOpen = !cardState.tagsOpen;
+        if (cardState.tagsOpen) openTags();
+        else closeExtras("tags");
+      } else if (btn.dataset.a === "coach") {
+        cardState.coachOpen = !cardState.coachOpen;
+        if (cardState.coachOpen) openCoach();
+        else closeExtras("coach");
+      }
+      syncActionLabels();
+    };
+  });
+}
+
+function syncActionLabels() {
+  const s = cardBody();
+  if (!s) return;
+  s.querySelectorAll(".ns-btn[data-a]").forEach((btn) => {
+    if (btn.dataset.a === "tags") btn.textContent = cardState.tagsOpen ? "Close tags" : "Tags";
+    if (btn.dataset.a === "coach") btn.textContent = cardState.coachOpen ? "Close AI" : "Ask AI";
+  });
+}
+
+function closeExtras(which) {
+  const s = cardBody();
+  if (!s) return;
+  const extra = s.querySelector(`[data-extra="${which}"]`);
+  if (extra) extra.remove();
+}
+
+function openTags() {
+  const s = cardBody();
+  if (!s) return;
+  if (!cardState.videoId) return;
+  const existing = s.querySelector('[data-extra="tags"]');
+  if (existing) {
+    existing.classList.remove("visually-hidden");
+    return;
+  }
+  const box = document.createElement("div");
+  box.dataset.extra = "tags";
+  box.innerHTML = '<div class="ns-skeleton"><span></span><span></span><span></span></div>';
+  s.querySelector(".ns-extras").appendChild(box);
+  if (cardState.tags) {
+    renderTags(box, cardState.tags);
+    return;
+  }
+  api(`/api/videos/tags?videoId=${encodeURIComponent(cardState.videoId)}`).then((res) => {
+    const data = res && res.ok ? res.data : null;
+    if (!data) {
+      box.innerHTML = '<p class="ns-note ns-note--bad">Tags unavailable. Check that the server is running.</p>';
+      return;
+    }
+    cardState.tags = data;
+    renderTags(box, data);
+  });
+}
+
+function renderTags(box, data) {
+  const tags = data.tags || [];
+  const additions = data.additions || [];
+  if (tags.length === 0 && additions.length === 0) {
+    box.innerHTML = '<p class="ns-note">No public tags on this video.</p>';
+    return;
+  }
+  let html = "";
+  if (tags.length) {
+    html += `<div class="ns-taghead"><b>Tags</b><span>${tags.length} on video</span></div>` +
+      `<div class="ns-tagwrap">${tags.map((t) => tagChip(t.tag, t.score, false)).join("")}</div>`;
+  }
+  if (additions.length) {
+    html += `<div class="ns-taghead"><b>Worth adding</b><span>from your keyword vault</span></div>` +
+      `<div class="ns-tagwrap">${additions.map((t) => tagChip(t.tag, t.score, true)).join("")}</div>`;
+  }
+  html += '<p class="ns-foot">Click a tag to copy it.</p>';
+  box.innerHTML = html;
+  box.querySelectorAll(".ns-tag").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (navigator.clipboard) navigator.clipboard.writeText(el.dataset.tag);
+      el.classList.add("copied");
+      setTimeout(() => el.classList.remove("copied"), 700);
+    });
+  });
+}
+
+function tagChip(tag, score, isAdd) {
+  return `<span class="ns-tag${isAdd ? " ns-add" : ""}" data-tag="${esc(tag)}">${esc(tag)}` +
+    `<span class="ns-tagscore">${score == null ? "—" : score}</span></span>`;
+}
+
+function openCoach() {
+  const s = cardBody();
+  if (!s) return;
+  if (!cardState.videoId) return;
+  const existing = s.querySelector('[data-extra="coach"]');
+  if (existing) {
+    existing.classList.remove("visually-hidden");
+    return;
+  }
+  const box = document.createElement("div");
+  box.dataset.extra = "coach";
+  box.innerHTML = `
+    <div class="ns-coach">
+      <div class="ns-coach-q">
+        <textarea rows="2" placeholder="Ask about this video. Example: why is this performing well?"></textarea>
+        <button class="ns-btn" type="button" data-a="ask">Ask</button>
+      </div>
+      <div class="ns-answer"></div>
+    </div>`;
+  s.querySelector(".ns-extras").appendChild(box);
+  const textarea = box.querySelector("textarea");
+  const answer = box.querySelector(".ns-answer");
+  const askBtn = box.querySelector("[data-a=ask]");
+  const ask = () => {
+    const query = textarea.value.trim();
+    if (!query || askBtn.disabled) return;
+    askBtn.disabled = true;
+    answer.textContent = "Working on it…";
+    api("/api/ai/studio", { method: "POST", body: { action: "coach", videoId: cardState.videoId, query } }).then((res) => {
+      askBtn.disabled = false;
+      const data = res && res.ok ? res.data : null;
+      if (!data || data.error) {
+        answer.textContent = data && data.error ? data.error : "Couldn't reach the coach. Is the server running?";
+      } else {
+        answer.textContent = data.answer;
+      }
+    });
+  };
+  askBtn.addEventListener("click", ask);
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ask();
+  });
 }
 
 function showWatchCard(videoId) {
   buildCard();
-  cardRoot.innerHTML =
-    '<div class="ns"><h1>Niche-Scope <button class="close">×</button></h1><div class="ns-body"><p class="off">Loading…</p></div></div>';
-  cardRoot.querySelector(".close").addEventListener("click", () => {
-    if (cardHost) cardHost.remove();
-    cardHost = null;
-    cardRoot = null;
-  });
-
-  api("/api/videos/lookup", { method: "POST", body: { url: videoId } }).then((res) => {
-    if (!res || !res.ok || res.error) {
-      renderCard(null);
-      return;
-    }
-    renderCard(res.data);
-  });
+  cardState.videoId = videoId;
+  const s = cardBody();
+  if (s) s.innerHTML = '<p class="ns-note">Loading…</p>';
+  lookupVideo(videoId).then((data) => renderCard(data));
 }
 
-/* --------------------------- Thumbnail score pills --------------------------- */
+/* ------------------------- Thumbnail signal pills ------------------------- */
 
 const badgedIds = new Set();
 let overlayRunning = false;
-
-function lookupVideo(id) {
-  return api("/api/videos/lookup", { method: "POST", body: { url: id } }).then((res) => res);
-}
+let scanCountLogged = false;
 
 function addPill(anchor, id) {
   if (badgedIds.has(id)) return;
   badgedIds.add(id);
 
   const pill = document.createElement("div");
-  pill.textContent = "…";
-  pill.style.cssText =
-    "position:absolute;top:6px;left:6px;z-index:50;background:rgba(15,23,42,.85);color:#fff;" +
-    "font:700 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;padding:2px 7px;border-radius:999px;" +
-    "pointer-events:none;letter-spacing:.01em;";
+  pill.setAttribute("data-ns-theme", "");
+  pill.className = "ns-pill";
+  const meter = document.createElement("span");
+  meter.className = "ns-meter ns-meter--sm";
+  meter.innerHTML = segments(0, 8);
+  pill.appendChild(meter);
+  const sign = document.createElement("span");
+  sign.className = "ns-pill-sign";
+  sign.setAttribute("role", "status");
+  sign.setAttribute("aria-hidden", "true");
+  pill.appendChild(sign);
   anchor.style.position = "relative";
   anchor.appendChild(pill);
 
-  lookupVideo(id).then((res) => {
-    if (!res || !res.ok || !res.data || !res.data.seo) {
-      pill.textContent = "—";
+  lookupVideo(id).then((data) => {
+    if (!data || !data.seo) {
+      meter.innerHTML = segments(0, 8);
       return;
     }
-    const total = res.data.seo.total;
-    pill.textContent = `${grade(total)} ${total}`;
-    pill.style.background = scoreColor(total);
+    meter.innerHTML = segments(data.seo.total, 8);
+    meter.querySelectorAll(".ns-seg.on").forEach((seg) => {
+      seg.style.transitionDelay = "0ms";
+    });
+    const spike = data.vph && data.vph.vph != null && data.vph.vph >= 500;
+    const outlier = data.outlier != null && data.outlier >= 300;
+    sign.className = "ns-pill-sign" + (spike ? " on--trend" : "") + (outlier ? " on--outlier" : "");
   });
 }
+
+const THUMBNAIL_SELECTOR = 'a[href*="/watch"], a[href*="/shorts/"]';
 
 function scanThumbnails() {
   if (overlayRunning) return;
   if (!prefs.showPills) return;
   overlayRunning = true;
 
-  const links = document.querySelectorAll(
-    'a#thumbnail[href*="watch?v="], a#thumbnail[href*="/shorts/"], a.ytd-thumbnail[href*="watch?v="]'
-  );
+  const links = document.querySelectorAll(THUMBNAIL_SELECTOR);
+  if (!scanCountLogged) {
+    console.log("[niche-scope] thumbnail anchors matched:", links.length);
+    scanCountLogged = true;
+  }
   let added = 0;
   for (const a of links) {
-    if (added >= (prefs.pillLimit || 24)) break; // gentle on the local server per pass
+    if (added >= (prefs.pillLimit || 24)) break;
     const id = videoIdFromHref(a.getAttribute("href"));
     if (!id || badgedIds.has(id)) continue;
     addPill(a, id);
@@ -201,18 +564,355 @@ function scanThumbnails() {
   overlayRunning = false;
 }
 
-/* ------------------------------- Boot / routing ------------------------------ */
+/* ------------------------- Hover stats bar / tooltip ------------------------- */
+
+let tipAnchor = null;
+let tipPending = null;
+
+function showTipFor(anchor, id) {
+  if (tipAnchor === anchor) return;
+  tipAnchor = anchor;
+
+  const shadow = mountHost("tip", 0, 0);
+  const rect = anchor.getBoundingClientRect();
+  shadow.root.innerHTML = `
+    <div class="ns-surface ns-tip ns-enter">
+      <div class="ns-skeleton"><span></span><span></span><span></span><span></span></div>
+    </div>`;
+  const tip = shadow.shadow.querySelector(".ns-tip");
+
+  const posX = Math.min(rect.left, window.innerWidth - 226);
+  const posY = rect.bottom + 8;
+  const flip = posY + tip.offsetHeight + 70 > window.innerHeight ? rect.top - tip.offsetHeight - 8 : posY;
+  shadow.host.style.left = `${Math.max(8, posX)}px`;
+  shadow.host.style.top = `${Math.max(8, flip)}px`;
+  shadow.host.style.right = "auto";
+
+  if (tipPending === id) return;
+  tipPending = id;
+  lookupVideo(id).then((data) => {
+    if (tipAnchor !== anchor) return;
+    tipPending = null;
+    if (!data || !data.seo) {
+      tip.innerHTML = '<p class="ns-note">No data for this video right now.</p>';
+      return;
+    }
+    const v = data.video;
+    const spike = data.vph && data.vph.vph != null && data.vph.vph >= 500;
+    const outlier = data.outlier != null && data.outlier >= 300;
+    const rows = [
+      `<div class="ns-strip"><span class="k">views</span><span class="v">${fmtT(v.viewCount)}</span></div>`
+    ];
+    const ageDays = v.publishedAt ? Math.max(1, (Date.now() - new Date(v.publishedAt).getTime()) / 86_400_000) : null;
+    if (ageDays != null && v.viewCount > 0) {
+      rows.push(`<div class="ns-strip"><span class="k">views/day</span><span class="v ns-live">${fmtT(v.viewCount / ageDays)}</span></div>`);
+    }
+    if (v.likeCount != null) {
+      rows.push(`<div class="ns-strip"><span class="k">likes</span><span class="v">${fmtT(v.likeCount)}</span></div>`);
+    }
+    if (v.commentCount != null) {
+      rows.push(`<div class="ns-strip"><span class="k">comments</span><span class="v">${fmtT(v.commentCount)}</span></div>`);
+    }
+    if (v.viewCount > 0) {
+      if (v.likeCount != null) {
+        rows.push(`<div class="ns-strip"><span class="k">likes%</span><span class="v">${((v.likeCount / v.viewCount) * 100).toFixed(1)}</span></div>`);
+      }
+      if (v.commentCount != null) {
+        rows.push(`<div class="ns-strip"><span class="k">comments%</span><span class="v">${((v.commentCount / v.viewCount) * 100).toFixed(2)}</span></div>`);
+      }
+    }
+    if (data.vph && data.vph.vph != null) {
+      rows.push(`<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live" : "ns-time"}">${fmtT(data.vph.vph)}/hr</span></div>`);
+    }
+    const subs = data.channel && data.channel.subscriberCount;
+    if (subs != null && subs > 0 && v.viewCount > 0) {
+      rows.push(`<div class="ns-strip"><span class="k">reach</span><span class="v">${(v.viewCount / subs).toFixed(1)}× subs</span></div>`);
+    }
+    if (data.outlier != null) {
+      const delta = data.outlier - 100;
+      rows.push(`<div class="ns-strip"><span class="k">vs avg</span><span class="v ${delta >= 0 ? "ns-live" : "ns-time"}">${delta >= 0 ? "+" : ""}${delta}%</span></div>`);
+    }
+    rows.push(
+      `<div class="ns-strip"><span class="k">posted</span><span class="v ns-time">${fmtDate(v.publishedAt)}</span></div>`,
+      `<div class="ns-strip"><span class="k">duration</span><span class="v">${fmtDur(v.durationSeconds)}</span></div>`
+    );
+    let badges = "";
+    if (spike) badges += '<div class="ns-badge bt"><span class="bd"></span>trending</div>';
+    if (outlier) badges += '<div class="ns-badge bo"><span class="bd"></span>outlier</div>';
+    tip.innerHTML = `${badges ? `<div class="ns-badges">${badges}</div>` : ""}` +
+      `<div class="ns-strips">${rows.join("")}</div>`;
+  });
+}
+
+function hideTip() {
+  tipAnchor = null;
+  tipPending = null;
+  removeHost("tip");
+}
+
+/* ------------------------- Search keyword panel ------------------------- */
+
+let searchState = null;
+
+function showSearchPanel(term) {
+  const shadow = mountHost("search", 16, 288);
+  shadow.root.innerHTML = `
+    <div class="ns-surface ns-enter" style="width:232px;padding:10px 12px 8px;">
+      <div class="ns-head"><span class="dot"></span><h1>Keyword scope</h1>
+        <button class="close" type="button">×</button></div>
+      <p class="ns-note">${esc(term)}</p>
+      <div class="ns-body"><div class="ns-skeleton"><span></span><span></span><span></span></div></div>
+    </div>`;
+  shadow.shadow.querySelector(".close").addEventListener("click", () => {
+    removeHost("search");
+    searchState = { ...(searchState || {}), closed: true };
+  });
+  const body = shadow.shadow.querySelector(".ns-body");
+
+  const render = (r) => {
+    const k = r.results && r.results[0];
+    let html = "";
+    if (k) {
+      html += meterRow("demand", k.demandScore);
+      if (k.scored && k.competitionScore > 0) {
+        html += meterRow("competition", k.competitionScore, true);
+      } else {
+        html += `<div class="ns-row"><span class="t">competition</span><span class="n">—</span></div>`;
+      }
+      html += meterRow("opportunity", k.overallScore);
+    }
+    if (r.questions && r.questions.length) {
+      html += `<div class="ns-section-title">People ask</div>` +
+        `<div class="ns-chips">${r.questions.slice(0, 5).map((q) => questionChip(q)).join("")}</div>`;
+    }
+    if (r.matchingTerms && r.matchingTerms.length) {
+      html += `<div class="ns-section-title">Related terms</div>` +
+        `<div class="ns-chips">${r.matchingTerms.slice(0, 8).map((t) => `<button class="ns-chipbtn" type="button" data-term="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
+    }
+    if (r.results && r.results.length > 1) {
+      html += `<div class="ns-section-title">Top suggestions</div>` +
+        `<div class="ns-list">${r.results.slice(1, 5).map((x) => topSug(x)).join("")}</div>`;
+    }
+    html += `<div class="ns-actions">`;
+    html += k && !(k.scored && k.competitionScore > 0)
+      ? `<button class="ns-btn" type="button" data-a="rank">Score competition</button>`
+      : "";
+    html += `<button class="ns-btn" type="button" data-a="trend">Trending in niche</button></div>`;
+    html += `<div class="ns-trend"></div>`;
+    body.innerHTML = html;
+    body.querySelectorAll(".ns-chipbtn[data-term]").forEach((b) => {
+      b.addEventListener("click", () => {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        location.assign(`/results?search_query=${encodeURIComponent(b.dataset.term)}`);
+      });
+    });
+    const rankBtn = body.querySelector("[data-a=rank]");
+    if (rankBtn) {
+      rankBtn.addEventListener("click", () => {
+        rankBtn.disabled = true;
+        rankBtn.textContent = "Scoring…";
+        api("/api/keywords/research", { method: "POST", body: { seed: term, rankTop: 3, maxResults: 10 } }).then((res) => {
+          render(res && res.ok ? res.data : {});
+        });
+      });
+    }
+    const trendBtn = body.querySelector("[data-a=trend]");
+    if (trendBtn) {
+      trendBtn.addEventListener("click", () => {
+        trendBtn.disabled = true;
+        trendBtn.textContent = "Reading…";
+        const trendBox = body.querySelector(".ns-trend");
+        trendBox.innerHTML = '<div class="ns-skeleton"><span></span><span></span><span></span></div>';
+        api("/api/videos/trending-search", { method: "POST", body: { term, maxResults: 8 } }).then((res) => {
+          const d = res && res.ok ? res.data : null;
+          if (!d || (d.items && d.items.length === 0)) {
+            trendBox.innerHTML = `<p class="ns-note ns-note--bad">${d && d.notice ? esc(d.notice) : "No trending videos found."}</p>`;
+            return;
+          }
+          trendBox.innerHTML = `<div class="ns-section-title">Trending in niche</div><div class="ns-list">` +
+            d.items.map((it) => trendItem(it)).join("") + `</div>`;
+        });
+      });
+    }
+  };
+
+  const key = searchState && searchState.term === term ? searchState : null;
+  if (key && key.data) {
+    render(key.data);
+  } else {
+    api(`/api/keywords/${encodeURIComponent(term)}`).then((res) => {
+      if (res && res.ok && res.data && res.data.keyword) {
+        const data = { seed: term, results: [res.data.keyword], questions: [], matchingTerms: [] };
+        searchState = { term, data };
+        render(data);
+      } else {
+        api("/api/keywords/research", { method: "POST", body: { seed: term, rankTop: 0, maxResults: 10 } }).then((r2) => {
+          const d = r2 && r2.ok ? r2.data : null;
+          if (!d) {
+            body.innerHTML = '<p class="ns-note ns-note--bad">Research unavailable right now. Is the server running?</p>';
+            return;
+          }
+          searchState = { term, data: d };
+          render(d);
+        });
+      }
+    });
+  }
+}
+
+function questionChip(q) {
+  return q && q.length < 40 ? `<span class="ns-chipbtn ns-q">${esc(q)}</span>` : "";
+}
+
+function topSug(x) {
+  return `<a class="ns-item" href="/results?search_query=${encodeURIComponent(x.term)}" target="_blank" rel="noopener">` +
+    `<span class="ns-item-title">${esc(x.displayTerm || x.term)}</span><span class="ns-item-v">${x.demandScore || 0}</span></a>`;
+}
+
+function trendItem(it) {
+  const views = it.viewCount != null ? fmt(it.viewCount) : null;
+  return `<a class="ns-item" href="/watch?v=${on(it.videoId)}" target="_blank" rel="noopener">` +
+    `<span class="ns-item-title">${esc(it.title)}</span>` +
+    `${views ? `<span class="ns-item-v">${views}</span>` : ""}</a>`;
+}
+
+/* ------------------------- Channel research card ------------------------- */
+
+function showChannelCard(ref) {
+  const shadow = mountHost("channel", 16, 64);
+  shadow.root.innerHTML = `
+    <div class="ns-surface ns-enter" style="width:232px;padding:10px 12px 8px;">
+      <div class="ns-head"><span class="dot"></span><h1>Channel signal</h1>
+        <button class="close" type="button">×</button></div>
+      <div class="ns-body"><div class="ns-skeleton"><span></span><span></span><span></span></div></div>
+    </div>`;
+  shadow.shadow.querySelector(".close").addEventListener("click", () => removeHost("channel"));
+  const body = shadow.shadow.querySelector(".ns-body");
+
+  api("/api/channels/lookup", { method: "POST", body: { url: ref } }).then((res) => {
+    const d = res && res.ok ? res.data : null;
+    if (!d || !d.channel) {
+      body.innerHTML = `<p class="ns-note">${res && res.data && res.data.error ? esc(res.data.error) : "No data for this channel right now."}</p>`;
+      return;
+    }
+    const c = d.channel;
+    const vids = d.recentVideos || [];
+    const avg = vids.length ? vids.reduce((a, b) => a + b.viewCount, 0) / vids.length : null;
+    const winners = avg ? vids.filter((v) => v.viewCount > avg * 1.5).sort((a, b) => b.viewCount - a.viewCount).slice(0, 3) : [];
+    const cadence = cadenceOf(vids);
+
+    let rows = "";
+    if (c.subscriberCount != null) rows += stripRow("subs", fmt(c.subscriberCount));
+    if (c.viewCount != null) rows += stripRow("views", fmt(c.viewCount));
+    if (c.videoCount != null) rows += stripRow("uploads", fmt(c.videoCount));
+    if (cadence) rows += stripRow("cadence", cadence);
+    if (avg) rows += stripRow("avg views", fmt(Math.round(avg)));
+
+    let html = `<div class="ns-strips">${rows}</div>`;
+    if (winners.length) {
+      html += `<div class="ns-section-title">Winners</div><div class="ns-list">` +
+        winners.map((v) => `<a class="ns-item" href="/watch?v=${on(v.videoId)}" target="_blank" rel="noopener">` +
+          `<span class="ns-item-title">${esc(v.title)}</span>` +
+          `<span class="ns-item-v">${fmt(v.viewCount)}</span></a>`).join("") +
+        `</div>`;
+    }
+    if (vids.length) {
+      const last = vids.reduce((a, b) => (a.publishedAt >= b.publishedAt ? a : b));
+      rows = "";
+      html += `<div class="ns-section-title">Latest upload</div><div class="ns-list">` +
+        `<a class="ns-item" href="/watch?v=${on(last.videoId)}" target="_blank" rel="noopener">` +
+        `<span class="ns-item-title">${esc(last.title)}</span>` +
+        `<span class="ns-item-v">${fmt(last.viewCount)}</span></a></div>`;
+    }
+    body.innerHTML = html;
+  });
+}
+
+function stripRow(k, v) {
+  return `<div class="ns-strip"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+}
+
+function cadenceOf(vids) {
+  if (vids.length < 2) return null;
+  const sorted = [...vids].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const seen = sorted.slice(0, 10);
+  let sum = 0;
+  let n = 0;
+  for (let i = 1; i < seen.length; i++) {
+    const d1 = new Date(seen[i - 1].publishedAt).getTime();
+    const d2 = new Date(seen[i].publishedAt).getTime();
+    if (d1 > d2) {
+      sum += (d1 - d2) / 86400000;
+      n++;
+    }
+  }
+  if (!n) return null;
+  const days = Math.max(0, Math.round(sum / n));
+  return days <= 1 ? "daily" : days <= 4 ? "every ~" + days + " days" : "roughly weekly";
+}
+
+/* ------------------------------- Routing ------------------------------- */
 
 function currentVideoId() {
   return videoIdFromHref(location.href);
 }
 
-function route() {
+function currentLocation() {
+  // This script owns www.youtube.com research overlays. Studio gets its own
+  // script (Phase C); other subdomains (tv/music) get nothing.
+  if (location.hostname !== "www.youtube.com") return { type: "none" };
   const id = currentVideoId();
-  if (id && prefs.showCard) {
-    showWatchCard(id);
+  if (id) return { type: "watch", id };
+  const p = location.pathname;
+  if (p.startsWith("/results")) {
+    const term = new URLSearchParams(location.search).get("search_query") || "";
+    return { type: "results", term };
+  }
+  if (/^\/@[\w.\-]+/.test(p) || /^\/channel\//.test(p)) {
+    return { type: "channel", ref: p };
+  }
+  return { type: "none" };
+}
+
+function routeOverlays() {
+  const loc = currentLocation();
+  switch (loc.type) {
+    case "watch":
+      removeHost("search");
+      removeHost("channel");
+      if (prefs.showCard) showWatchCard(loc.id);
+      else removeHost("card");
+      break;
+    case "results":
+      removeHost("card");
+      removeHost("channel");
+      if (prefs.showResearch && !(searchState && searchState.closed)) showSearchPanel(loc.term);
+      else removeHost("search");
+      break;
+    case "channel":
+      removeHost("card");
+      removeHost("search");
+      if (prefs.showResearch) showChannelCard(loc.ref);
+      else removeHost("channel");
+      break;
+    default:
+      removeHost("card");
+      removeHost("search");
+      removeHost("channel");
+      break;
   }
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes[PREFS_KEY]) return;
+  prefs = { ...DEFAULT_PREFS, ...(changes[PREFS_KEY].newValue || {}) };
+  routeOverlays();
+  if (prefs.showPills) {
+    badgedIds.clear();
+    scanThumbnails();
+  }
+  if (!prefs.showHover) hideTip();
+});
 
 function onDomChange() {
   scanThumbnails();
@@ -220,27 +920,38 @@ function onDomChange() {
 
 let observer = null;
 function init() {
+  console.log("[niche-scope] content script ready:", location.href);
   ensurePrefs();
-  route();
+  routeOverlays();
   scanThumbnails();
 
+  document.addEventListener("pointerover", (e) => {
+    if (!prefs.showHover) return;
+    const a = e.target.closest ? e.target.closest(THUMBNAIL_SELECTOR) : null;
+    if (!a) return;
+    const id = videoIdFromHref(a.getAttribute("href"));
+    if (id) showTipFor(a, id);
+  });
+  document.addEventListener("pointerout", (e) => {
+    if (!prefs.showHover) return;
+    if (!tipAnchor) return;
+    if (e.target.closest && e.target.closest(THUMBNAIL_SELECTOR)) return;
+    hideTip();
+  });
+
   observer = new MutationObserver(() => {
-    // Debounce rapid DOM churn (YouTube is chatty).
     clearTimeout(observer._t);
     observer._t = setTimeout(onDomChange, 800);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// Re-route when navigating between watch pages via the History API.
+// Re-route when navigating via the History API.
 let lastHref = location.href;
 function watchUrl() {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    const id = currentVideoId();
-    if (id && prefs.showCard) {
-      showWatchCard(id);
-    }
+    routeOverlays();
     scanThumbnails();
   }
   requestAnimationFrame(watchUrl);

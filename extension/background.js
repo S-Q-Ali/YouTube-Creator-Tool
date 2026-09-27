@@ -3,8 +3,21 @@
 // caches GET/lookup responses for a few minutes to avoid hammering the local server.
 const API_BASE = "http://localhost:3000";
 const TTL_MS = 10 * 60 * 1000;
+const SLOW_TIMEOUT = 60 * 1000; // AI + yt-dlp routes can take a while
+const FAST_TIMEOUT = 15 * 1000;
 const PREFS_KEY = "ns:prefs";
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24 };
+const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showHover: true, showResearch: true, showCoach: true };
+
+// Never session-cache AI or live-search responses: results vary per query and can
+// exceed the per-item quota (server already caches AI results in its own DB).
+const NO_CACHE_PREFIXES = ["/api/ai/", "/api/videos/trending-search/"];
+function cacheable(path) {
+  return !NO_CACHE_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function timeoutFor(path) {
+  return cacheable(path) ? FAST_TIMEOUT : SLOW_TIMEOUT;
+}
 
 function cacheKey(path, opts) {
   return path + (opts && opts.body ? JSON.stringify(opts.body) : "");
@@ -13,16 +26,18 @@ function cacheKey(path, opts) {
 async function apiFetch(path, opts) {
   const key = cacheKey(path, opts);
 
-  const cached = await chrome.storage.session.get(key);
-  if (cached[key] && Date.now() - cached[key].ts < TTL_MS) {
-    return cached[key].data;
+  if (cacheable(path)) {
+    const cached = await chrome.storage.session.get(key);
+    if (cached[key] && Date.now() - cached[key].ts < TTL_MS) {
+      return cached[key].data;
+    }
   }
 
   const res = await fetch(API_BASE + path, {
     method: (opts && opts.method) || "GET",
     headers: { "Content-Type": "application/json" },
     body: opts && opts.body ? JSON.stringify(opts.body) : undefined,
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(timeoutFor(path)),
   });
 
   let data;
@@ -32,10 +47,14 @@ async function apiFetch(path, opts) {
     data = { error: res.statusText || "Bad response from Niche-Scope" };
   }
 
-  if (res.ok) {
-    const store = {};
-    store[key] = { ts: Date.now(), data };
-    chrome.storage.session.set(store);
+  if (res.ok && cacheable(path)) {
+    try {
+      const store = {};
+      store[key] = { ts: Date.now(), data };
+      await chrome.storage.session.set(store);
+    } catch {
+      // Session storage can hit its item/byte cap; caching is best-effort.
+    }
   }
   return data;
 }

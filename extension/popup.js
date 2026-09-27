@@ -5,8 +5,9 @@ const dot = document.getElementById("dot");
 const serverText = document.getElementById("serverText");
 const body = document.getElementById("body");
 
-function card(label, value) {
-  return `<div class="card"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+function strip(label, value, cls = "") {
+  const vcls = cls ? ` ${cls}` : "";
+  return `<div class="ns-strip"><span class="k">${label}</span><span class="v${vcls}">${value}</span></div>`;
 }
 
 function setServer(on, text) {
@@ -34,6 +35,9 @@ async function loadPrefs() {
   const p = res.data;
   document.getElementById("showCard").checked = !!p.showCard;
   document.getElementById("showPills").checked = !!p.showPills;
+  document.getElementById("showHover").checked = p.showHover !== false;
+  document.getElementById("showResearch").checked = p.showResearch !== false;
+  document.getElementById("showCoach").checked = p.showCoach !== false;
   document.getElementById("pillLimit").value = String(p.pillLimit || 24);
 }
 
@@ -43,6 +47,9 @@ function savePrefs() {
     prefs: {
       showCard: document.getElementById("showCard").checked,
       showPills: document.getElementById("showPills").checked,
+      showHover: document.getElementById("showHover").checked,
+      showResearch: document.getElementById("showResearch").checked,
+      showCoach: document.getElementById("showCoach").checked,
       pillLimit: Number(document.getElementById("pillLimit").value) || 24,
     },
   });
@@ -56,44 +63,44 @@ async function main() {
   if (!quota) {
     setServer(false, "Server offline");
     body.innerHTML =
-      '<div class="card"><div class="label">Niche-Scope server isn’t running</div>' +
-      '<div class="value muted">Start it with <b>npm run dev</b> in the project folder, then reopen this popup.</div></div>';
+      '<p class="err">Server isn\'t running. Start it with <b>npm run dev</b> in the project folder, then reopen this popup.</p>';
     return;
   }
 
   setServer(true, "Connected to local server");
-  const rows = ["<div class='row'>"];
+  const rows = [];
 
   if (comp && comp.dashboard) {
     const d = comp.dashboard;
-    rows.push(card("Tracked", `${d.videos.length} videos · ${d.channels.length} channels · ${d.keywords.length} keywords`));
+    rows.push(
+      strip("tracked", `${d.videos.length} videos, ${d.channels.length} channels, ${d.keywords.length} keywords`)
+    );
   }
 
   if (quota && quota.quota) {
     const q = quota.quota;
     rows.push(
-      `<div class="card"><div class="label">API quota</div><div class="value">` +
-        `data ${fmt(q.data.used)}/10k · search ${q.search.used}/100` +
-        `</div></div>`
+      strip("api quota", `data ${fmt(q.data.used)}/10k, search ${q.search.used}/100`)
     );
   }
 
   if (auth) {
-    rows.push(card("Own channel", auth.connected ? "Connected (audit ready)" : "Not connected"));
+    rows.push(strip("own channel", auth.connected ? "connected, audit ready" : "not connected"));
   }
 
-  rows.push("</div>");
-  body.innerHTML = rows.join("");
+  body.innerHTML = rows.length ? rows.join("") : '<p class="muted">No tracked items yet.</p>';
 }
 
 document.getElementById("showCard").addEventListener("change", savePrefs);
 document.getElementById("showPills").addEventListener("change", savePrefs);
+document.getElementById("showHover").addEventListener("change", savePrefs);
+document.getElementById("showResearch").addEventListener("change", savePrefs);
+document.getElementById("showCoach").addEventListener("change", savePrefs);
 document.getElementById("pillLimit").addEventListener("change", savePrefs);
 loadPrefs();
 
 main().catch(() => {
   setServer(false, "Server offline");
   body.innerHTML =
-    '<div class="card"><div class="label">Niche-Scope server isn’t running</div>' +
-    '<div class="value muted">Start it with <b>npm run dev</b>, then reopen this popup.</div></div>';
+    '<p class="err">Server isn\'t running. Start it with <b>npm run dev</b>, then reopen this popup.</p>';
 });

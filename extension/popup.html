@@ -2,95 +2,65 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <link rel="stylesheet" href="ns-theme.css" />
     <style>
-      :root { color-scheme: light; }
+      :root { color-scheme: dark; }
       * { box-sizing: border-box; }
       body {
-        width: 300px;
+        width: 380px;
         margin: 0;
-        font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-        font-size: 13px;
-        color: #0f0f0f;
-      }
-      header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
         padding: 12px 14px;
-        background: linear-gradient(135deg, #dc2626, #9f1239);
-        color: #fff;
+        background: var(--ns-soot);
+        color: var(--ns-ink);
+        font-family: var(--ns-font-ui);
+        font-size: 13px;
       }
-      header .logo {
-        display: grid;
-        place-items: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 6px;
-        background: #fff;
-        color: #dc2626;
-        font-weight: 800;
-        font-size: 12px;
-      }
-      header h1 { margin: 0; font-size: 14px; font-weight: 700; }
-      header small { margin-left: auto; opacity: 0.85; }
-      main { padding: 12px 14px; }
-      .card {
-        border: 1px solid #e4e4e4;
-        border-radius: 10px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-      }
-      .card .label {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: #8a8a8a;
-        font-weight: 700;
-      }
-      .card .value { font-size: 15px; font-weight: 700; margin-top: 2px; }
-      .row { display: flex; gap: 8px; }
-      .row .card { flex: 1; }
-      .status { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 8px; }
-      .dot { width: 9px; height: 9px; border-radius: 50%; background: #d1d5db; }
-      .dot.on { background: #16a34a; }
-      .dot.off { background: #dc2626; }
-      .err { color: #b91c1c; font-size: 12px; line-height: 1.5; }
-      .opt { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 12px; }
-      .opt select { margin-left: auto; }
-      footer { padding: 10px 14px 12px; border-top: 1px solid #f0f0f0; }
-      footer a { color: #2563eb; text-decoration: none; font-size: 12px; }
+      .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+      .head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ns-mute); }
+      .head .dot.on { background: var(--ns-amber); }
+      .head .dot.off { background: var(--ns-bad); }
+      .head h1 { margin: 0; font-size: 13px; font-weight: 600; }
+      .head #serverText { margin-left: auto; font-size: 12px; color: var(--ns-mute); }
+      .section { margin: 14px 0; }
+      .section-title { font-size: 12px; color: var(--ns-mute); margin: 0 0 4px; }
+      .opt { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; }
+      .opt select { margin-left: auto; background: var(--ns-lift); color: var(--ns-ink); border: 1px solid var(--ns-hair);
+        border-radius: var(--ns-radius); padding: 3px 6px; font-family: var(--ns-font-ui); }
+      footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--ns-hair); }
+      footer a { color: var(--ns-amber); text-decoration: none; font-size: 12px; }
       footer a:hover { text-decoration: underline; }
-      .muted { color: #6b7280; }
+      .err { color: var(--ns-bad); font-size: 12px; line-height: 1.5; }
+      .muted { color: var(--ns-mute); }
     </style>
   </head>
-  <body>
-    <header>
-      <span class="logo">NS</span>
+  <body data-ns-theme>
+    <div class="head">
+      <span class="dot" id="dot"></span>
       <h1>Niche-Scope</h1>
-      <small>local</small>
-    </header>
-    <main>
-      <div class="status"><span class="dot" id="dot"></span><span id="serverText">Checking server…</span></div>
-      <div id="body">
-        <div class="card"><div class="label">Loading…</div></div>
+      <span id="serverText">Checking server…</span>
+    </div>
+    <div id="body">
+      <div class="ns-strip"><span class="k">status</span><span class="v ns-dead">loading</span></div>
+    </div>
+    <div class="section" id="prefsCard">
+      <div class="section-title">Overlay on YouTube</div>
+      <label class="opt"><input type="checkbox" id="showCard" /> Watch-page score card</label>
+      <label class="opt"><input type="checkbox" id="showPills" /> Thumbnail signal pills</label>
+      <label class="opt"><input type="checkbox" id="showHover" /> Thumbnail hover data</label>
+      <label class="opt"><input type="checkbox" id="showResearch" /> Search and channel research</label>
+      <label class="opt"><input type="checkbox" id="showCoach" /> AI coach on watch pages</label>
+      <div class="opt">
+        <span>Pills per pass</span>
+        <select id="pillLimit">
+          <option value="12">12</option>
+          <option value="24">24</option>
+          <option value="40">40</option>
+          <option value="60">60</option>
+        </select>
       </div>
-      <div class="card" id="prefsCard">
-        <div class="label">Overlay on YouTube</div>
-        <label class="opt"><input type="checkbox" id="showCard" /> Watch-page score card</label>
-        <label class="opt"><input type="checkbox" id="showPills" /> Thumbnail score pills</label>
-        <div class="opt">
-          <span>Pills per pass</span>
-          <select id="pillLimit">
-            <option value="12">12</option>
-            <option value="24">24</option>
-            <option value="40">40</option>
-            <option value="60">60</option>
-          </select>
-        </div>
-      </div>
-    </main>
+    </div>
     <footer>
-      <a href="http://localhost:3000" target="_blank" rel="noopener">Open dashboard →</a>
+      <a href="http://localhost:3000" target="_blank" rel="noopener">Open dashboard</a>
     </footer>
     <script src="popup.js"></script>
   </body>
