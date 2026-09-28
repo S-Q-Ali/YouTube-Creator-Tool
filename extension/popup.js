@@ -1,4 +1,4 @@
-// Niche-Scope popup: server health + quota + tracked counts from the local API.
+﻿// Niche-Scope popup: server health + quota + tracked counts from the local API.
 const API_BASE = "http://localhost:3000";
 
 const dot = document.getElementById("dot");
@@ -45,12 +45,10 @@ async function loadPrefs() {
   if (!res || !res.ok || !res.data) return;
   const p = res.data;
   document.getElementById("showCard").checked = !!p.showCard;
-  document.getElementById("showPills").checked = !!p.showPills;
   document.getElementById("showResearch").checked = p.showResearch !== false;
   document.getElementById("showCoach").checked = p.showCoach !== false;
   document.getElementById("dataMode").value = p.dataMode || "full";
   document.getElementById("tileLimit").value = String(p.tileLimit || 60);
-  document.getElementById("pillLimit").value = String(p.pillLimit || 24);
 }
 
 function savePrefs() {
@@ -58,12 +56,10 @@ function savePrefs() {
     type: "prefs:set",
     prefs: {
       showCard: document.getElementById("showCard").checked,
-      showPills: document.getElementById("showPills").checked,
       showResearch: document.getElementById("showResearch").checked,
       showCoach: document.getElementById("showCoach").checked,
       dataMode: document.getElementById("dataMode").value || "full",
       tileLimit: Number(document.getElementById("tileLimit").value) || 60,
-      pillLimit: Number(document.getElementById("pillLimit").value) || 24,
     },
   });
 }
@@ -107,12 +103,10 @@ async function main() {
 }
 
 document.getElementById("showCard").addEventListener("change", savePrefs);
-document.getElementById("showPills").addEventListener("change", savePrefs);
 document.getElementById("showResearch").addEventListener("change", savePrefs);
 document.getElementById("showCoach").addEventListener("change", savePrefs);
 document.getElementById("dataMode").addEventListener("change", savePrefs);
 document.getElementById("tileLimit").addEventListener("change", savePrefs);
-document.getElementById("pillLimit").addEventListener("change", savePrefs);
 loadPrefs();
 
 main().catch(() => {

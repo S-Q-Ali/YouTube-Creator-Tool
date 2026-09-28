@@ -1,8 +1,7 @@
-/* Niche-Scope content script: SEO scores + research overlays on YouTube.
+﻿/* Niche-Scope content script: SEO scores + research overlays on YouTube.
  * Fetches happen in the background worker (avoids page CORS).
- * Surfaces: always-on grid data lines, thumbnail verdict chips, watch-page
- * card (score + tags + AI coach), search-page keyword panel, channel research
- * card. */
+ * Surfaces: the strip under every grid card, watch-page card (score + tags +
+ * AI coach), search-page keyword panel, channel research card. */
 
 /* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
 const NS_TOKENS = `
@@ -154,7 +153,7 @@ function api(path, opts) {
   });
 }
 
-const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "full", tileLimit: 60 };
+const DEFAULT_PREFS = { showCard: true, showResearch: true, showCoach: true, dataMode: "full", tileLimit: 60 };
 const DATA_MODES = ["off", "full"];
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
@@ -172,7 +171,6 @@ function ensurePrefs() {
     if (res && res.ok && res.data) {
       prefs = mergePrefs(res.data);
       routeOverlays();
-      scanThumbnails();
       scanTiles();
     }
   });
@@ -784,7 +782,7 @@ function scanTiles() {
     tile.append(line);
     tile.setAttribute(NS_TILES.MARK, "1");
     linedTiles.add(tile);
-    const row = { line, vph: null, views: null, durationSeconds: null, vphDay: null, spike: false };
+    const row = { line, vph: null, subscribers: null, outlier: null, spike: false };
     fillLine(row, row);
     // The same video can appear in more than one slot on a page; every one of
     // those strips has to be filled, not just the first.
@@ -847,23 +845,19 @@ async function flushUpgrades() {
   else pendingGrid.clear();
 }
 
+/* The strip renders four numbers, so the grid model carries only those. Views,
+   duration, publish date and the 24h trend belong to YouTube's own row — reading
+   them again here would only duplicate what the page already shows. */
 function storeRow(id, data) {
   const model = {
     vph: data.velocity && data.velocity.vph != null ? data.velocity.vph : null,
-    vphDay: data.velocity ? data.velocity.vphDay : null,
-    views: data.viewCount,
-    publishedAt: data.publishedAt,
-    durationSeconds: data.durationSeconds,
     subscribers: data.subscribers,
     outlier: data.outlier,
-    score: data.score,
-    grade: data.grade,
     spike: !!data.spike
   };
   gridMem.set(id, model);
   if (gridMem.size > 400) gridMem.clear();
   applyModel(id, model);
-  paintChip(id, model);
 }
 
 function applyModel(id, model) {
@@ -871,86 +865,11 @@ function applyModel(id, model) {
   if (!rows) return;
   for (const row of rows) {
     row.vph = model.vph;
-    row.vphDay = model.vphDay;
-    row.views = model.views;
-    row.publishedAt = model.publishedAt;
-    row.durationSeconds = model.durationSeconds;
     row.subscribers = model.subscribers;
     row.outlier = model.outlier;
     row.spike = model.spike;
     fillLine(row, model);
   }
-}
-
-/* ------------------------- Thumbnail signal pills ------------------------- */
-
-const badgedIds = new Set();
-const chipsById = new Map();
-let overlayRunning = false;
-let scanCountLogged = false;
-
-function addPill(anchor, id) {
-  if (badgedIds.has(id)) return;
-  badgedIds.add(id);
-
-  const pill = document.createElement("div");
-  pill.setAttribute("data-ns-theme", currentTheme());
-  pill.className = "ns-pill";
-  const meter = document.createElement("span");
-  meter.className = "ns-meter ns-meter--sm";
-  meter.setAttribute("aria-hidden", "true");
-  meter.innerHTML = segments(0, 8);
-  const grade = document.createElement("span");
-  grade.className = "ns-pill-grade";
-  const sign = document.createElement("span");
-  sign.className = "ns-pill-sign";
-  sign.setAttribute("role", "status");
-  sign.setAttribute("aria-hidden", "true");
-  pill.appendChild(meter);
-  pill.appendChild(grade);
-  pill.appendChild(sign);
-  anchor.style.position = "relative";
-  anchor.appendChild(pill);
-
-  chipsById.set(id, { meter, grade, sign });
-  if (gridMem.has(id)) paintChip(id, gridMem.get(id));
-  else queueUpgrade(id);
-}
-
-/* Verdict on the thumbnail, numbers on the line: the same batch row feeds
-   both, so a card never shows two different velocities. */
-function paintChip(id, model) {
-  const chip = chipsById.get(id);
-  if (!chip) return;
-  chip.meter.innerHTML = segments(model.score || 0, 8);
-  chip.meter.querySelectorAll(".ns-seg.on").forEach((seg) => {
-    seg.style.transitionDelay = "0ms";
-  });
-  chip.grade.textContent = model.grade || "";
-  chip.sign.className = "ns-pill-sign" + (model.spike ? " on--trend" : "");
-}
-
-const THUMBNAIL_SELECTOR = 'a[href*="/watch"], a[href*="/shorts/"]';
-
-function scanThumbnails() {
-  if (overlayRunning) return;
-  if (!prefs.showPills) return;
-  overlayRunning = true;
-
-  const links = document.querySelectorAll(THUMBNAIL_SELECTOR);
-  if (!scanCountLogged) {
-    console.log("[niche-scope] thumbnail anchors matched:", links.length);
-    scanCountLogged = true;
-  }
-  let added = 0;
-  for (const a of links) {
-    if (added >= (prefs.pillLimit || 24)) break;
-    const id = videoIdFromHref(a.getAttribute("href"));
-    if (!id || badgedIds.has(id)) continue;
-    addPill(a, id);
-    added++;
-  }
-  overlayRunning = false;
 }
 
 /* ------------------------- Search keyword panel ------------------------- */
@@ -1212,10 +1131,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const before = prefs.dataMode;
   prefs = mergePrefs(changes[PREFS_KEY].newValue);
   routeOverlays();
-  if (prefs.showPills) {
-    badgedIds.clear();
-    scanThumbnails();
-  }
   // Density and card data both change what a line says, so redraw every line
   // rather than guess which preference the change was about.
   if (prefs.dataMode !== before) {
@@ -1237,7 +1152,6 @@ function stripLines() {
 }
 
 function onDomChange() {
-  scanThumbnails();
   scanTiles();
 }
 
@@ -1246,7 +1160,6 @@ function init() {
   console.log("[niche-scope] content script ready:", location.href);
   ensurePrefs();
   routeOverlays();
-  scanThumbnails();
   scanTiles();
 
   observer = new MutationObserver(() => {
@@ -1262,7 +1175,6 @@ function watchUrl() {
   if (location.href !== lastHref) {
     lastHref = location.href;
     routeOverlays();
-    scanThumbnails();
     // A new video is a new title to name the file after.
     watchThumb = { id: currentVideoId(), title: watchThumb.title, thumbnailUrl: "" };
   }

@@ -1,39 +1,5 @@
 /* Positioning for injected surfaces on YouTube pages. Look comes from ns-theme.css. */
 
-.ns-pill {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 50;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  padding: 2px 3px;
-  background: var(--ns-glass);
-  border-radius: var(--ns-radius);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-.ns-pill-sign {
-  width: 5px;
-  height: 5px;
-  margin-left: 4px;
-  border-radius: 50%;
-  background: transparent;
-  transition: background var(--ns-motion) ease-out;
-}
-
-.ns-pill-sign.on--trend {
-  background: var(--ns-amber);
-  box-shadow: 0 0 0 1px rgba(240, 165, 0, 0.35);
-}
-
-.ns-pill-sign.on--outlier {
-  background: var(--ns-cyan);
-  box-shadow: 0 0 0 1px rgba(60, 200, 222, 0.35);
-}
-
 /* The strip sits outside YouTube's clickable card content, but it lives in the
    same shadow tree, so it still must never eat a click meant for the video. */
 .ns-line {
