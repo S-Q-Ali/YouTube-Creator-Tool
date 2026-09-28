@@ -736,8 +736,10 @@ function lineCell(text, className, title) {
   return cell;
 }
 
+/* An empty span, not a typed bar: the rule is drawn in CSS so it lines up with
+   the figures instead of inheriting the row font's pipe metrics. */
 function lineSep() {
-  return lineCell("|", "ns-line-sep");
+  return lineCell("", "ns-line-sep");
 }
 
 function paintRow(row, cells) {
@@ -806,26 +808,40 @@ function scanTiles() {
    Captions buttons, so it is a card control rather than another annotation. It
    is not part of the strip: it shows in every data mode, it is built from the
    DOM alone, and a press needs no server round trip because the title and the
-   image are already in the card. Cards whose overlay we cannot find are left
-   exactly as YouTube drew them. */
+   image are already in the card. When YouTube has not built that row yet — which
+   is most cards, most of the time — the icon places itself in the corner of the
+   image instead of leaving a silent gap. */
 function cardTitle(tile) {
-  const el = tile.querySelector("h3[title], h3 a[title], h3 a, h3, a#video-title, #video-title");
+  const el = tile.querySelector(
+    "h3[title], h3 a[title], h3 a, h3, a.ytLockupMetadataViewModelTitle, .ytLockupMetadataViewModelTitle, a#video-title-link, a#video-title"
+  );
   if (!el) return "";
   return (el.getAttribute("title") || el.textContent || "").replace(/\s+/g, " ").trim();
 }
 
 function cardImage(tile) {
-  const img = tile.querySelector("ytd-thumbnail img[src], img.yt-core-image[src], img[src]");
+  const img = tile.querySelector("yt-thumbnail-view-model img[src], ytd-thumbnail img[src], img.yt-core-image[src], img[src]");
   return img ? img.getAttribute("src") : "";
 }
 
+/* One line per page load, so the next time YouTube renames a card the console
+   says which selector went stale instead of leaving a silent gap. */
+const hoverProbe = { cards: 0, mounted: 0, missed: 0, boxes: [], reasons: [] };
+let hoverProbeLogged = false;
+
+function noteProbe(list, value) {
+  if (value && list.indexOf(value) === -1) list.push(value);
+}
+
 function mountHoverIcon(tile, id) {
+  hoverProbe.cards++;
   if (tile.querySelector("[data-ns-ovl]")) return;
-  // The card, its grid wrapper and the thumbnail itself are all too big to be a
+
+  const box = NS_THUMB.thumbContainer(tile);
+  noteProbe(hoverProbe.boxes, box ? box.tagName.toLowerCase() : "");
+  // The card, its grid wrapper and the image box itself are all too big to be a
   // neighbour: the icon has to land inside the overlay, not below the image.
-  const unsafe = [tile, tile.closest(NS_TILES.HOSTS), tile.querySelector("ytd-thumbnail")].filter(Boolean);
-  const anchor = NS_THUMB.findAnchor(tile, unsafe);
-  if (!anchor || !anchor.parentNode) return;
+  const unsafe = [tile, tile.closest(NS_TILES.HOSTS), box].filter(Boolean);
 
   const btn = NS_THUMB.buildHoverButton(id, cardTitle(tile), cardImage(tile), (payload) => {
     NS_THUMB.setState(btn, "saving");
@@ -834,7 +850,13 @@ function mountHoverIcon(tile, id) {
       setTimeout(() => NS_THUMB.setState(btn, null), 2600);
     });
   });
-  anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+
+  if (NS_THUMB.attach(btn, tile, unsafe)) {
+    hoverProbe.mounted++;
+    return;
+  }
+  hoverProbe.missed++;
+  noteProbe(hoverProbe.reasons, box ? "row-unavailable" : "no-image-box");
 }
 
 function scanHoverIcons() {
@@ -842,6 +864,13 @@ function scanHoverIcons() {
   NS_TILES.each(document, prefs.tileLimit || 60, (tile, id) => {
     mountHoverIcon(tile, id);
   }, { skipLined: false });
+
+  if (hoverProbeLogged || !hoverProbe.cards) return;
+  hoverProbeLogged = true;
+  console.debug(
+    `[niche-scope] hover icon: cards=${hoverProbe.cards} mounted=${hoverProbe.mounted} ` +
+      `missed=${hoverProbe.missed} image-box=[${hoverProbe.boxes.join(", ")}] missed-because=[${hoverProbe.reasons.join(", ")}]`
+  );
 }
 
 /* --------------------- Tier 1: upgrade the painted line --------------------- */

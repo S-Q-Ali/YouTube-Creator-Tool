@@ -1,9 +1,20 @@
 /* Positioning for injected surfaces on YouTube pages. Look comes from ns-theme.css. */
 
 /* The strip sits outside YouTube's clickable card content, but it lives in the
-   same shadow tree, so it still must never eat a click meant for the video. */
+   same shadow tree, so it still must never eat a click meant for the video.
+   The readings are the exception: each number carries a title explaining what
+   it is, and a title only reaches the pointer if something there is hoverable.
+   Only the numbers take the pointer, so a click in the gaps between them still
+   falls through to the card exactly as it did before. */
 .ns-line {
   pointer-events: none;
+}
+
+.ns-line-v,
+.ns-line-vel,
+.ns-line-out {
+  pointer-events: auto;
+  cursor: help;
 }
 
 /* The save-thumbnail row lives inside YouTube's own menu, so it borrows the
@@ -77,8 +88,34 @@
   cursor: progress;
 }
 
+/* Placed in the image itself, because on today's cards the site's own hover row
+   is built only once the card is hovered and so is absent during a page pass.
+   Bottom-left is the one corner nothing else claims: the duration badge owns
+   bottom-right and the Volume and Captions row, when YouTube does build it,
+   owns the top-right. Hidden until the card is hovered so it never sits on the
+   artwork at rest, and revealed on focus too so a keyboard can reach it. */
+.ns-ovl-btn--boxed {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 2;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.55);
+  transition: opacity 120ms ease-out, background 120ms ease-out, transform 120ms ease-out;
+}
+
+[data-ns-ovl-host]:hover .ns-ovl-btn--boxed,
+.ns-ovl-btn--boxed:focus-visible,
+.ns-ovl-btn--boxed[data-state] {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ns-ovl-btn {
+    transition: none;
+  }
+
+  .ns-ovl-btn--boxed {
     transition: none;
   }
 }
