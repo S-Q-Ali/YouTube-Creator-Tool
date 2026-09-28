@@ -159,7 +159,7 @@ longer holds. Typography is not touched.
 - [x] G0.3: `extension/tests/theme.test.mjs`, written red first - every `class="..."` token in `content.js` must resolve in `ns-theme.css` - red with 33 undefined classes, green after the fold; also asserts no script carries a `var(--ns-` reference
 - [x] G0.4: `CONSTRAINTS.md` - contrast floor, blur cardinality rule, reduced-motion and reduced-contrast handling, and the rule that it is not weakened to make a change pass. Point `AGENTS.md` at it
 - [x] G0.5: record which value is correct for the three drifts already present (`.ns-reading` 20px vs 19px, `.ns-strip .v` 13px vs 12.5px, `ns-enter` vs `ns-open`) - the card's shipped values won; see "Resolved" in `tasks/glass-plan.md`
-- [ ] G0.6: live check - reload the extension, open a watch page, and confirm the card, research panel, tags, coach and skeleton render unchanged against a pre-G0 screenshot. **Blocks G1.**
+- [ ] G0.6: live check - reload the extension, open a watch page, and confirm the card, research panel, tags, coach and skeleton render unchanged against a pre-G0 screenshot. **Blocks G1.** Superseded in part by W10/W11 below, which cover the two problems the first live check actually found.
 
 - [ ] G1.1: glass token layer - per-theme tint alphas, blur radii, luminous hairline, inner highlight, separate dark/light shadow sets
 - [ ] G1.2: radius scale - 12px surfaces, 8px inner, 999px pills
@@ -179,3 +179,37 @@ longer holds. Typography is not touched.
 - [ ] G6.2: `forced-colors` and `prefers-contrast: more` verified per surface
 - [ ] G6.3: `extension/README.md` - the new look, what the depth-as-signal choice means, and how a person is told a preference made the surfaces solid
 - [ ] G6.4: version bump, full gates, push
+
+## Phase W10: Found by the first live check (before G1)
+
+Both are pre-existing, not glass damage. Neither was reachable by a test,
+because both are about where a thing is allowed to appear rather than what it
+contains. Tokens were compared against the deleted JavaScript copies to confirm
+G0 changed no value.
+
+- [x] W10.1: the floating panels had no width and no height cap. A video with
+  eight reading rows grew past the bottom of the viewport with nothing to
+  scroll it back, which is what made the card look broken instead of plain.
+  `.ns-host` in `content.css` now owns the width (capped against the viewport)
+  and the cap, with `overflow-y: auto`. `position` and stacking stay inline on
+  purpose, since a page rule can outrank a content-script stylesheet.
+  *Test:* `theme.test.mjs` fails if a `.ns-host` rule appears without both a
+  width and a height cap.
+- [x] W10.2: the up-next list on a watch page got no strips. The old rule kept
+  strips off watch pages so one would not land on the hero of the video you just
+  opened - right about the hero, wrong about the sidebar, which holds the same
+  compact cards a grid does. `NS_TILES.scanRoot` now answers with a root: the
+  document on a grid route, the sidebar on a watch page, and null everywhere
+  else. A watch page with no sidebar yet returns null rather than falling back to
+  the document, which is the bug the scoping exists to prevent.
+  *Test:* `watchPage.test.mjs`, fixture `watch.html`, whose `#primary` holds a
+  valid lockup that must never get a strip.
+
+## Phase W11: Open, needs a browser
+
+- [ ] W11.1: reload the extension, open a watch page, confirm the card is 300px
+  wide, stops at the viewport edge and scrolls when the readings are long, and
+  that the close button still works.
+- [ ] W11.2: confirm the up-next list now carries the same two-row strip as a
+  grid, that the video being watched has no strip on it, and that no ad slot
+  got one.

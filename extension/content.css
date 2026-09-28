@@ -1,5 +1,24 @@
 /* Positioning for injected surfaces on YouTube pages. Look comes from ns-theme.css. */
 
+/* The floating panels - the watch card, the search panel, the channel panel.
+   Each is mounted fixed over YouTube's own layout with its own right/top, and
+   none of them had a size, which is the whole problem: a video with eight
+   reading rows grew past the bottom of the viewport with no way to scroll back,
+   so the card stopped being a panel and became something broken-looking.
+
+   The width is capped against the viewport as well as fixed, because on a
+   narrow window a 300px panel plus YouTube's own sidebar has nowhere to go.
+   The cap is on the host, not the surface, so it holds no matter how much the
+   card fills in. position and stacking are set inline in content.js instead -
+   a page rule can outrank this file, and a panel that stopped being fixed
+   would be worse than one that is slightly too tall. */
+.ns-host {
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* The strip sits outside YouTube's clickable card content, but it lives in the
    same shadow tree, so it still must never eat a click meant for the video.
    The readings are the exception: each number carries a title explaining what

@@ -76,6 +76,23 @@ describe("one stylesheet owns every component", () => {
     expect(used.size).toBeGreaterThan(25);
   });
 
+  it("bounds every floating panel so it cannot run off the screen", () => {
+    // The card is a fixed panel over a YouTube watch page. It has a close button
+    // but no width and no height cap, so a video with eight reading rows grew
+    // past the bottom of the viewport with nothing to scroll it back - which is
+    // what made it look broken rather than merely plain. Any panel that can
+    // reach the edge of the screen has to declare how wide it is and where it
+    // stops.
+    const panelRule = positioning.match(/\.ns-host[^{]*\{[^}]*\}/g) || [];
+    expect(panelRule.length).toBeGreaterThan(0);
+
+    const bounded = panelRule.every((rule) => /width\s*:/.test(rule) && /max-height\s*:/.test(rule));
+    expect(bounded).toBe(true);
+
+    // And it has to be scrollable, or a cap just hides the overflow.
+    expect(positioning).toMatch(/overflow-y\s*:\s*auto/);
+  });
+
   it("does not keep a hand-maintained copy of the component CSS in JavaScript", () => {
     // A stylesheet copied into a string is the thing that drifted, and the tell
     // for it is a custom-property reference in a script: `var(--ns-…)` is CSS

@@ -197,8 +197,15 @@ const hosts = {};
 function mountHost(name, right, top) {
   if (hosts[name]) return hosts[name];
   const host = document.createElement("div");
+  host.className = "ns-host";
+  host.setAttribute("data-ns-host", name);
   host.setAttribute("data-ns-theme", currentTheme());
-  host.style.cssText = `position:fixed;right:${right}px;top:${top}px;z-index:999999;`;
+  // position and stacking stay inline on purpose: a content-script stylesheet
+  // can lose to a page rule of equal specificity, and a panel that stopped
+  // being fixed would be worse than a panel that is slightly too tall. Only the
+  // size lives in CSS, where a test can check it - this used to have no size at
+  // all.
+  host.style.cssText = `position:fixed;z-index:999999;right:${right}px;top:${top}px;`;
   const shadow = host.attachShadow({ mode: "open" });
   const root = document.createElement("div");
   shadow.appendChild(root);
@@ -611,19 +618,13 @@ function watchThumbMenu() {
 /* ------------------------- Always-on grid data line ------------------------- */
 
 /* Painted on every card of a grid route, then filled in place from
-   /api/videos/grid. Scoped to grid routes so a strip never lands on the watch
-   page or on the hero of the page you opened. Which cards qualify lives in
-   lib/tiles.js. */
+   /api/videos/grid. Where a scan is allowed to look is lib/tiles.js's
+   `scanRoot`, which also covers a watch page's up-next list. Which cards
+   qualify lives beside it. */
 
 const linedTiles = new WeakSet();
 const tileRows = new Map();
 let linesPass = 0;
-
-function gridPage() {
-  const p = location.pathname;
-  if (currentVideoId()) return false;
-  return p === "/" || p.startsWith("/results") || p.startsWith("/feed") || /^\/@/.test(p) || p.startsWith("/channel/") || p.startsWith("/c/") || p.startsWith("/browse/");
-}
 
 function lineCell(text, className, title) {
   const cell = document.createElement("span");
@@ -675,12 +676,14 @@ function buildLine() {
    qualify — and the nesting that used to give a video two of them — belongs to
    lib/tiles.js, which is tested against a real grid. */
 function scanTiles() {
-  if (prefs.dataMode === "off" || !gridPage()) return;
+  if (prefs.dataMode === "off") return;
+  const root = NS_TILES.scanRoot(location.pathname, currentVideoId());
+  if (!root) return;
   linesPass++;
   const pass = linesPass;
   const budget = prefs.tileLimit || 60;
 
-  NS_TILES.each(document, budget, (tile, id) => {
+  NS_TILES.each(root, budget, (tile, id) => {
     if (pass !== linesPass) return false;
 
     const line = buildLine();
@@ -757,8 +760,9 @@ function mountHoverIcon(tile, id) {
 }
 
 function scanHoverIcons() {
-  if (!gridPage()) return;
-  NS_TILES.each(document, prefs.tileLimit || 60, (tile, id) => {
+  const root = NS_TILES.scanRoot(location.pathname, currentVideoId());
+  if (!root) return;
+  NS_TILES.each(root, prefs.tileLimit || 60, (tile, id) => {
     mountHoverIcon(tile, id);
   }, { skipLined: false });
 

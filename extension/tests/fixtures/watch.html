@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  A trimmed copy of a real YouTube watch page.
+
+  The reason this fixture exists: the strip was deliberately kept off watch
+  pages, on the grounds that "a strip never lands on the watch page or on the
+  hero of the page you opened". That was right about the hero and wrong about
+  the sidebar - the up-next list is made of the same compact cards as a grid,
+  so leaving it out meant the user got stats everywhere except the one place
+  they are deciding what to watch next.
+
+  So scanning on a watch page has to be scoped to the sidebar, and the trap in
+  #primary is here to prove the scope holds: a tile in the hero area must never
+  get a strip, even though it is a perfectly valid lockup with a watch link.
+-->
+<ytd-watch-masthead id="masthead">
+  <div id="primary">
+    <div id="player">
+      <yt-lockup-view-model id="hero-trap">
+        <a id="thumbnail" href="/watch?v=HeroTrap00000">
+          <img alt="the video you are already watching" />
+        </a>
+        <h3>The video you are already watching</h3>
+      </yt-lockup-view-model>
+    </div>
+  </div>
+
+  <div id="secondary">
+    <ytd-watch-next-secondary-results-renderer>
+      <div id="contents">
+        <ytd-compact-video-renderer id="up1">
+          <a href="/watch?v=UpNext0000001">First up next</a>
+          <h3>First up next</h3>
+        </ytd-compact-video-renderer>
+        <ytd-compact-video-renderer id="up2">
+          <a href="/watch?v=UpNext0000002&amp;pp=abc">Second up next</a>
+          <h3>Second up next</h3>
+        </ytd-compact-video-renderer>
+        <ytd-ad-slot-renderer id="ad">
+          <ytd-compact-video-renderer>
+            <a href="/watch?v=AdVideo000001">Sponsored</a>
+          </ytd-compact-video-renderer>
+        </ytd-ad-slot-renderer>
+        <ytd-compact-video-renderer id="up3">
+          <a href="/watch?v=UpNext0000003">Third up next</a>
+          <h3>Third up next</h3>
+        </ytd-compact-video-renderer>
+      </div>
+    </ytd-watch-next-secondary-results-renderer>
+  </div>
+</ytd-watch-masthead>
