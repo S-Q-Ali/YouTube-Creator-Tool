@@ -22,8 +22,14 @@
 (function () {
   "use strict";
 
-  const SIDEBAR = "ytd-watch-next-secondary-results-renderer, #secondary-inner";
-  const TILE = "ytd-compact-video-renderer";
+  // Reuse the shipped selectors instead of restating them. The first run of
+  // this probe looked only for ytd-compact-video-renderer, which YouTube no
+  // longer puts in the up-next list, and reported a confident "sidebar present,
+  // no tiles" for ten seconds - a wrong answer that would have sent Phase SB1
+  // to fix a selector that was already correct. One list, one owner.
+  const NS_TILES = globalThis.NS_TILES;
+  const SIDEBAR = NS_TILES ? NS_TILES.SIDEBAR : "ytd-watch-next-secondary-results-renderer, #secondary-inner";
+  const TILE = NS_TILES ? NS_TILES.TILES : "yt-lockup-view-model, ytd-video-renderer, ytd-compact-video-renderer";
   const WAIT_MS = 10000;
   const POLL_MS = 250;
 
@@ -87,6 +93,27 @@
     put("tile-margin", style(first).marginBottom);
     put("tile-img-h", px(first.querySelector("img, yt-image")?.getBoundingClientRect().height || 0));
 
+    /* --- the parent chain above the tile, which is where the card must go --- */
+    // The height and visibility numbers above are not enough. A list can be a
+    // flex column whose children are direct, or a grid, or a scroller whose
+    // children sit inside an inner wrapper - and inserting beside the tile
+    // rather than into the list's actual child container is how an insertion
+    // lands in the right coordinates and the wrong box. Walk up and record the
+    // display of each ancestor until the list element.
+    const chain = [];
+    for (let el = first; el && el !== sidebar.parentElement && chain.length < 6; el = el.parentElement) {
+      const s = style(el);
+      chain.push(describe(el) + "[" + s.display + (s.display.includes("flex") ? "/" + s.flexDirection : "") + "]");
+    }
+    put("chain", chain.join(" > "));
+
+    // The direct child of the list container is what an insertBefore must
+    // target. If the tile is wrapped, that wrapper - not the tile - is the row.
+    const listBox = first.closest("#items, ytd-item-section-renderer, [class*='contents']") || parent;
+    put("list-box", describe(listBox));
+    put("tile-is-listbox-child", listBox ? listBox.children[0] === first : false);
+    put("listbox-children", listBox ? listBox.children.length : 0);
+
     /* --- would a plain div dropped in front of it be seen at all? --- */
     // This is the whole risk of the plan. A div inside someone else's renderer
     // could be clipped, hidden, collapsed, or styled to nothing. Measure it
@@ -101,9 +128,15 @@
     put("probe-visible",
       probe.getBoundingClientRect().height > 0 && probeStyle.display !== "none" &&
       probeStyle.visibility !== "hidden" && probeStyle.opacity !== "0");
-    // Does inserting it actually move the first video down?
-    put("first-tile-top-before", px(first.getBoundingClientRect().top));
+
+    // Does inserting it actually move the first video down? This is the number
+    // the whole "push two videos" promise rests on, and it is the one thing a
+    // computed-style check cannot tell you: an element can be visible and still
+    // occupy a position that does not push a sibling down.
+    const topBefore = first.getBoundingClientRect().top;
+    put("first-tile-top-before", px(topBefore));
     put("first-tile-top-after", px(first.getBoundingClientRect().top));
+    put("pushed-by", px(first.getBoundingClientRect().top - topBefore));
     probe.remove();
     put("first-tile-top-restored", px(first.getBoundingClientRect().top));
 
@@ -145,9 +178,28 @@
       return;
     }
     if (Date.now() - started > WAIT_MS) {
-      console.log("[niche-scope:SB0] reason=timeout-after-" + WAIT_MS + "ms " +
-        "path=" + location.pathname +
-        " sidebar-present=" + !!document.querySelector(SIDEBAR));
+      // A timeout is the least useful thing a probe can print. It says "not
+      // ready" and leaves the real question - what is actually in the list -
+      // unanswered, which is how the first run came to report a sidebar with
+      // no tiles for ten seconds and nearly sent Phase SB1 to fix a selector
+      // that was already right. Describe what is there instead, so a timeout
+      // is still an answer.
+      const sidebar = document.querySelector(SIDEBAR);
+      const seen = {};
+      if (sidebar) {
+        for (const el of sidebar.querySelectorAll("*")) {
+          const tag = el.tagName.toLowerCase();
+          seen[tag] = (seen[tag] || 0) + 1;
+        }
+      }
+      const top = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 12)
+        .map(([tag, n]) => tag + "×" + n).join(",");
+      console.log("[niche-scope:SB0] reason=timeout path=" + location.pathname +
+        " sidebar-present=" + !!sidebar +
+        " sidebar-w=" + (sidebar ? sidebar.offsetWidth : 0) +
+        " looking-for=" + TILE.replace(/\s+/g, "") +
+        " descendants=" + (sidebar ? sidebar.querySelectorAll("*").length : 0) +
+        (top ? " most-common=[" + top + "]" : ""));
       return;
     }
     setTimeout(poll, POLL_MS);
