@@ -10,10 +10,13 @@ Niche-Scope server at `http://localhost:3000`.
   thin strip hung under the card itself - no hovering, no clicking. It says only
   what the card cannot: subscribers on the first line, views per hour and the
   outlier score on the second. YouTube's own channel, views and age are never
-  repeated. The strip waits for the server, so it never shows a guess.
-- **Thumbnails** (home, search, related, shorts): a **download** icon appears
-  under the card's own Volume and Captions buttons on hover, and saves the
-  thumbnail at the best size that exists.
+  repeated. The strip waits for the server, so it never shows a guess. Hover any
+  reading and the strip explains that one number in a line of plain text.
+- **Thumbnails** (home, search, related, shorts): a **download** icon appears on
+  the card's own hover controls and saves the thumbnail at the best size that
+  exists. It sits under YouTube's Volume and Captions buttons when the site has
+  built that row, and in the bottom-left corner of the image when it has not -
+  which is the usual case, because that row only exists while a card is hovered.
 - **Watch pages**: a floating card in the top-right shows the video's SEO score,
   letter grade, views, channel subs, velocity, the 24h trend when it exists, and
   the actionable/performance split.
@@ -37,6 +40,10 @@ channel's own lifetime views per video, so it works for channels nobody has
 tracked, and the watch card prefers the average of the videos it has stored when
 it has one.
 
+The two rows are not equally loud. Subscribers is context, so it sits back in the
+muted grey; views per hour and the outlier score are the judgements, so they
+carry the weight. Cyan means rate, amber means something worth a second look.
+
 `Cards per pass` (24-100) caps how many cards a single DOM pass may touch, which
 keeps a fast scroll cheap; everything is picked up on the next pass.
 
@@ -55,7 +62,19 @@ reload needed.
 3. Enable **Developer mode** (top-right).
 4. Click **Load unpacked** and select this `extension/` folder.
 5. Open YouTube home — every card should show a strip, and hovering a card should
-   reveal the download icon under its Volume and Captions buttons.
+   reveal the download icon on it. Hard-refresh (`Ctrl+Shift+R`) after reloading
+   the extension, or the old script keeps running.
+
+If the icon does not appear, the console prints one line explaining itself:
+
+```
+[niche-scope] hover icon: cards=24 mounted=24 missed=0 image-box=[yt-thumbnail-view-model] missed-because=[]
+```
+
+`cards` is how many cards were walked, `mounted` how many got the icon, and
+`image-box` names the element it was placed in. A `missed` count, or a missing
+`image-box`, means YouTube changed the card again and the selector list in
+`extension/lib/thumb.js` needs the new name.
 
 ## How it talks to your server
 
@@ -103,9 +122,11 @@ Two different numbers, deliberately not conflated:
 - Scores only appear for public videos (private/region-blocked videos error gracefully as `—`).
 - If the server is off the strip simply stays empty — it would rather say nothing
   than guess — and the popup says “Server offline”.
-- The card’s **download** icon is only added when the card’s hover overlay can be
-  found; on an overlay layout we do not recognise it is skipped rather than drawn
-  in the wrong place. The **Download thumbnail** menu row on a watch page has the
-  same rule: it needs the site’s own Audio and captions row to sit under.
+- The card’s **download** icon is never drawn outside the image, and never on a
+  card that has no image to draw it on. It prefers the site’s own hover row and
+  falls back to a corner of the image, so a layout we do not recognise loses the
+  ideal position rather than the feature. The **Download thumbnail** menu row on a
+  watch page has a different rule: it needs the site’s own Audio and captions row
+  to sit under, because a watch page has no image corner to fall back to.
 - YouTube Studio has no overlays yet; that is Phase C.
 - No build step: plain JS/CSS/HTML, loaded unpacked.

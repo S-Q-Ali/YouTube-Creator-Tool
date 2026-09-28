@@ -53,19 +53,20 @@
 /* ------------------------- Always-on grid data line ------------------------- */
 
 /* The strip hangs below the card, not inside it. A hairline at 10% keeps it
-   reading as an annotation on YouTube's own row rather than a second card, and
-   the numbers are the identity: a hairline separator, cyan for rate, amber for
-   momentum. */
+   reading as an annotation on YouTube's own row rather than a second card.
+   Within it the hierarchy is deliberate: subscribers is context and recedes,
+   the two judgements are the point and carry the weight, cyan means rate and
+   amber means something worth looking at. */
 .ns-line {
   display: block;
-  margin-top: 6px;
-  padding-top: 5px;
+  margin-top: 7px;
+  padding-top: 6px;
   border-top: 1px solid var(--ns-hair);
   font-family: var(--ns-font-read);
   font-size: 11.5px;
   font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--ns-mute);
 }
 
@@ -73,6 +74,8 @@
   display: none;
 }
 
+/* Hidden, and allowed to shrink, so a very large subscriber count truncates
+   rather than pushing the second reading off the card. */
 .ns-line-row {
   display: flex;
   align-items: baseline;
@@ -85,12 +88,38 @@
   display: none;
 }
 
+.ns-line-v,
+.ns-line-vel,
+.ns-line-out {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: var(--ns-radius);
+}
+
+/* Each number carries an explanation in its title, which only a pointer can
+   reach. A faint wash on hover is the whole affordance — no underline, no
+   change of weight, nothing that would reflow the card. */
+.ns-line-v:hover,
+.ns-line-vel:hover,
+.ns-line-out:hover {
+  background: var(--ns-hair);
+}
+
+/* Context, so it sits back. */
 .ns-line-subs {
-  color: var(--ns-ink);
+  color: var(--ns-mute);
+  font-variation-settings: "wght" 400;
 }
 
 .ns-line-v {
   color: var(--ns-ink);
+}
+
+.ns-line-vel,
+.ns-line-out {
+  color: var(--ns-ink);
+  font-variation-settings: "wght" var(--ns-w-read-strong);
 }
 
 .ns-line-vel {
@@ -114,8 +143,16 @@
   font-variation-settings: "wght" 400;
 }
 
+/* A drawn rule rather than a typed bar: the pipe inherited whatever metrics the
+   row's font happened to have, and sat at the wrong height beside tabular
+   figures. */
 .ns-line-sep {
-  color: var(--ns-tick);
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 0;
+  background: var(--ns-tick);
+  font-size: 0;
 }
 
 .ns-line-extra {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Niche-Scope",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Subscribers, views-per-hour and an outlier score under every YouTube card, plus a one-click thumbnail save from the card's own hover controls, backed by your local Niche-Scope server.",
   "permissions": ["storage", "downloads"],
   "host_permissions": ["http://localhost:3000/*"],

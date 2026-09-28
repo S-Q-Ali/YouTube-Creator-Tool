@@ -27,14 +27,14 @@
     if (opts.mode === "off") return { ctx: subs, judge, blank: true };
 
     const subscribers = meta.fmtSubs(model.subscribers);
-    if (subscribers) push(subs, subscribers + " subs", "ns-line-subs", "Channel subscribers");
+    if (subscribers) push(subs, subscribers + " subs", "ns-line-subs", "Subscribers to the channel today");
 
     if (model.vph != null) {
       push(
         judge,
         meta.fmtVph(model.vph),
         model.spike ? "ns-line-vel ns-line-vel--spike" : "ns-line-vel",
-        "Views per hour since publish"
+        "Views per hour — lifetime views divided by how many hours the video has been up"
       );
     }
 

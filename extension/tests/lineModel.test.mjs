@@ -88,10 +88,12 @@ describe("the strip under a grid card", () => {
   });
 
   it("names every reading for the hover and for a screen reader", () => {
-    expect(hints(model().ctx)).toEqual(["Channel subscribers"]);
+    // These strings are the only explanation a person ever gets for a bare
+    // number, so each one has to say what the number is, not just name it.
+    expect(hints(model().ctx)).toEqual(["Subscribers to the channel today"]);
     expect(hints(model().judge)).toEqual([
-      "Views per hour since publish",
-      "3.4× what this channel usually gets"
+      "Views per hour — lifetime views divided by how many hours the video has been up",
+      "3.4× what this channel usually gets for a video"
     ]);
   });
 });

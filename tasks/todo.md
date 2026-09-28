@@ -120,3 +120,23 @@ Decisions locked by the user, after looking at the real cards: the strip hangs *
 - [x] V7: The Tier 0 grid reader retired - `parse`/`velocity`/`parseViews`/`parseAge` had no caller left once the strip went server-only, and `lib/velocity.ts` is now the only velocity implementation
 - [ ] V8: Live check - strip lands under the card on home/search/channel, no reflow, no duplicates, no chip, the icon appears under Volume and Captions on hover and saves the file, both themes, reduced motion
 - [ ] V9: `NS_TOKENS` in `content.js` re-checked against `extension/ns-theme.css` (canonical)
+
+## Phase W: Hover icon repair + card polish
+
+Follow-up to Phase V, from the user's report: the strip renders, the hover download icon does not. Root cause is in the plan - the current YouTube hover controls are created inside the hover *preview* on hover, so they are absent from the DOM when the card pass runs, and `findAnchor` returned null and skipped silently.
+
+- [x] W1: Diagnostic shipped with the fix - one `console.debug` per page load naming cards/mounted/missed, the image box element, and why a card was missed. A `__nsHover()` global was dropped: content scripts live in an isolated world, so a function the content script defines is invisible from the DevTools console, which is where the report is actually read.
+- [x] W2: `findAnchor` is now the first half of a cascade - (a) sit under the site's own row when one is really in the DOM, (b) otherwise the button is appended to the image box, `position: relative` only if static, `overflow` never touched. `hoverSlot` + `attach` are the tested seams
+- [x] W3: `cardTitle` learned the current lockup title (`a.ytLockupMetadataViewModelTitle`, `a#video-title-link`) with the BEM `h3` shapes as fallback
+- [x] W4: `.ns-ovl-btn--boxed` in the bottom-left corner (duration badge owns bottom-right), revealed on container hover and on focus, 36px hit area, one-button-per-card guard inside `attach` itself
+- [x] W5: Fixture gained the shape that actually ships - a `yt-lockup-view-model` with a `yt-thumbnail-view-model` and no hover row at all, which is what the old fixture was missing. 9 new tests cover both branches, the no-escape rule, the single-mount rule, the position-context rule and the honest no-image case. 154 pass
+- [x] W6: The readings now take the pointer (`pointer-events: auto` on the values only, so a click in the gaps still falls through) with a faint wash on hover, and every tip says what the number is - "Views per hour — lifetime views divided by how many hours the video has been up"
+- [x] W7: Strip hierarchy fixed - subscribers recedes to muted 400, the two judgements carry 700, the typed `|` became a drawn rule that lines up with tabular figures, cells can shrink and ellipsis, calmer leading
+- [x] W8: 0.5.1, `extension/README.md` (including how to read the probe line), gates, push
+- [ ] W9: Live check - hard-refresh YouTube, hover a card on **home** (not `/watch`, where the grid pass is off by design), confirm the icon, the tooltip, and an actual saved `.jpg`
+
+Two bugs the new tests caught before a browser ever saw them, both worth the
+fixture fix: `querySelector` with a comma-separated list returns the first match
+in *document* order, not the order you wrote, so the image link was beating the
+image element; and the one-button-per-card guard only existed at the call site,
+so a repeated page pass could stack icons.

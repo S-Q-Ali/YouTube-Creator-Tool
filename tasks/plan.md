@@ -179,6 +179,52 @@ surfaces Phases T and U built, on the user's reading of the real cards:
 Tracked in `tasks/todo.md` as Phase V. Commits: `90cb146`, `d7b632f`, `412dd0f`,
 `5ec1a3d`, `0c994be`, plus the 0.5.0 docs commit.
 
+## Phase W: Hover icon repair + card polish (planned, not started)
+
+Phases A–D above are unchanged and still unchecked. Phase W is a repair of Phase
+V's hover icon plus a polish pass on the strip, opened after the user reported
+that the strip renders but the download icon never appears.
+
+**Root cause (researched, 2026-09-28).** The strip working proves card discovery,
+route gating and the loaded build are all fine — the log's `content.js:1212`
+matches the committed file, and the tile pass reaches the cards. The icon is
+missing because `NS_THUMB.findAnchor` returns `null` and the pass skips
+silently. Two facts found in the wild DOM break the assumption it was built on:
+
+- The current hover control row is **`yt-thumbnail-hover-overlay-toggle-actions-view-model`**
+  inside a **`yt-thumbnail-view-model`**, not the legacy
+  `ytd-thumbnail-overlay-toggle-button-renderer` or the player's
+  `ytp-mute-toggle-button`. `findAnchor` matched none of them.
+- Those controls belong to the hover *preview* and are created when the card is
+  hovered, so at scan time they are not in the DOM at all. No selector can find
+  what is not there. A shipping extension (`yt-restore`) handles this by building
+  **its own** overlay inside `yt-thumbnail-view-model` rather than slotting under
+  YouTube's buttons.
+
+Secondary finding: the strip is `pointer-events: none`, so the `title` tooltips
+Phase V attached to each value can never show. That is why hovering a reading
+gives no explanation, and it is a one-line cause with a one-line fix.
+
+**Decisions.**
+- **Diagnose, then fix.** A `__nsHover()` report names the container, whether
+  native controls exist and why a card was skipped. Guessing a third time is
+  what produced this bug.
+- **Cascade, not a single guess.** Sit under the native hover row when one is
+  genuinely present (that is what the user asked for and it still happens on
+  legacy and some A/B buckets); otherwise place our own button inside the
+  thumbnail. The feature is never silently absent.
+- **Never leave the thumbnail.** The card, its grid wrapper and the thumbnail
+  element all stay ruled out as anchors, `position: relative` is set when static,
+  and `overflow` is never cleared — clearing it bleeds across adjacent cards.
+- **Tooltips are the strip's own.** `pointer-events` on the values, not the whole
+  strip, so a click still falls through where it did before.
+
+**Open question for the user.** Where the native row is absent, the icon has to
+land in a free corner of the thumbnail. Bottom-left is recommended: the duration
+badge owns bottom-right and the native row, when it appears, owns top-right.
+
+Tracked in `tasks/todo.md` as Phase W.
+
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |------|--------|------------|

@@ -55,8 +55,8 @@
 
   function outlierHint(percent) {
     if (percent == null || !isFinite(percent) || !(percent > 0)) return "";
-    if (percent >= 80 && percent < 125) return "Typical for this channel";
-    return fmtOutlierScore(percent) + " what this channel usually gets";
+    if (percent >= 80 && percent < 125) return "About what this channel usually gets";
+    return fmtOutlierScore(percent) + " what this channel usually gets for a video";
   }
 
   g.NS_META = {
