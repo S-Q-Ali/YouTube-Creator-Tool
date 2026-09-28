@@ -1,84 +1,13 @@
 /*
- * Tier 0 grid reader.
- *
- * YouTube already prints a video's views and age on the card, so the grid can
- * paint a reading immediately from that text — no network call, no quota — and
- * then let the server upgrade it with exact values.
+ * Shared formatters for the two surfaces that print our numbers: the strip
+ * under a grid card and the card on a watch page. One place to spell a figure
+ * is what stops the same number being written two ways on one screen.
  *
  * Loaded before content.js as a classic content script (content scripts are not
  * modules, so it publishes itself on globalThis) and driven in tests by
- * extension/tests/nsMeta.test.mjs, which also pins this file's velocity
- * maths to lib/velocity.ts so the instant reading and the upgraded reading can
- * never disagree.
+ * extension/tests/nsMeta.test.mjs.
  */
 (function (g) {
-  const HOUR_MS = 3_600_000;
-
-  const UNIT_HOURS = {
-    second: 1 / 3600,
-    minute: 1 / 60,
-    hour: 1,
-    day: 24,
-    week: 168,
-    month: 720,
-    year: 8760
-  };
-
-  const SUFFIX_MULTIPLIER = { K: 1e3, M: 1e6, B: 1e9 };
-
-  const VIEWS_RE = /([\d][\d.,]*)\s*([KMB])?\s+views?/i;
-  const NO_VIEWS_RE = /no\s+views/i;
-  const LIVE_PREFIX = "(?:streamed|premiered|watched|livestreamed)";
-  const REL_AGE_RE = new RegExp("(?:" + LIVE_PREFIX + "\\s+)?(\\d+)\\s+(second|minute|hour|day|week|month|year)s?\\s+ago", "i");
-  const YESTERDAY_RE = new RegExp(LIVE_PREFIX + "\\s+yesterday|^yesterday", "i");
-  const DATE_RE = /\b([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})\b/;
-
-  function parseViews(text) {
-    if (NO_VIEWS_RE.test(text)) return 0;
-    const m = text.match(VIEWS_RE);
-    if (!m) return null;
-    const digits = Number(m[1].replace(/,/g, ""));
-    if (!isFinite(digits)) return null;
-    const suffix = m[2] ? SUFFIX_MULTIPLIER[m[2].toUpperCase()] : 1;
-    return Math.round(digits * suffix);
-  }
-
-  function parseAge(text, now) {
-    const rel = text.match(REL_AGE_RE);
-    if (rel) {
-      return { ageHours: Number(rel[1]) * UNIT_HOURS[rel[2].toLowerCase()], ageLabel: rel[0].trim() };
-    }
-    const yesterday = text.match(YESTERDAY_RE);
-    if (yesterday) return { ageHours: 24, ageLabel: yesterday[0].trim() };
-
-    const dated = text.match(DATE_RE);
-    if (dated) {
-      const published = Date.parse(dated[1] + " " + dated[2] + ", " + dated[3]);
-      if (isFinite(published) && now - published > 0) {
-        return { ageHours: (now - published) / HOUR_MS, ageLabel: dated[0].trim() };
-      }
-    }
-    return { ageHours: null, ageLabel: null };
-  }
-
-  /** Reads the views and age a card already displays. */
-  function parse(text, now) {
-    const clean = String(text || "").replace(/\s+/g, " ").trim();
-    if (!clean) return { views: null, ageHours: null, ageLabel: null };
-    const age = parseAge(clean, now == null ? Date.now() : now);
-    return { views: parseViews(clean), ageHours: age.ageHours, ageLabel: age.ageLabel };
-  }
-
-  /** Same rule as lib/velocity.ts: rate per hour, age floored at one hour. */
-  function velocity(facts) {
-    if (!facts || facts.views == null || facts.ageHours == null) {
-      return { vph: null, vphDay: null, ageHours: 0 };
-    }
-    const ageHours = Math.max(facts.ageHours, 1);
-    const vph = round1(facts.views / ageHours);
-    return { vph, vphDay: round1(vph * 24), ageHours };
-  }
-
   function compact(n) {
     if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
     if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -91,11 +20,6 @@
     return compact(vph) + "/hr";
   }
 
-  function fmtVphDay(vphDay) {
-    if (vphDay == null || !isFinite(vphDay)) return "";
-    return compact(vphDay) + "/day";
-  }
-
   /* Exact counts use the same grouped digits the watch card prints, so a card
      and its detail panel never spell the same number two ways. */
   function fmtExact(n) {
@@ -103,7 +27,6 @@
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   }
 
-  /* The one reading a YouTube card never shows: when it was actually posted. */
   function fmtDate(iso) {
     if (!iso) return "";
     const d = new Date(iso);
@@ -116,26 +39,11 @@
     return compact(subs).replace(/\.0(?=[KMB]$)/, "");
   }
 
-  function fmtDur(secs) {
-    if (secs == null || !isFinite(secs)) return "";
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    if (m >= 60) return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") + ":" + String(s).padStart(2, "0");
-    return m + ":" + String(s).padStart(2, "0");
-  }
-
-  /* An outlier reads as a sentence, not a score: a factor, or "typical". */
   function outlierTone(percent) {
     if (percent == null || !isFinite(percent)) return "normal";
     if (percent >= 200) return "hot";
     if (percent < 80) return "cool";
     return "normal";
-  }
-
-  function fmtOutlier(percent) {
-    if (percent == null || !isFinite(percent) || !(percent > 0)) return "";
-    if (percent >= 80 && percent < 125) return "typical";
-    return round1(percent / 100) + "× usual";
   }
 
   /* On a card the outlier has no room for a sentence, so it reads as the score
@@ -151,23 +59,14 @@
     return fmtOutlierScore(percent) + " what this channel usually gets";
   }
 
-  function round1(value) {
-    return Math.round(value * 10) / 10;
-  }
-
   g.NS_META = {
-    parse,
-    velocity,
-    fmtVph,
-    fmtVphDay,
     compact,
+    fmtVph,
     fmtExact,
     fmtDate,
     fmtSubs,
-    fmtDur,
-    fmtOutlier,
+    outlierTone,
     fmtOutlierScore,
-    outlierHint,
-    outlierTone
+    outlierHint
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);
