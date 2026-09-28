@@ -79,12 +79,24 @@
     const hosts = [];
     if (doc.matches && doc.matches(HOSTS)) hosts.push(doc);
     for (const h of doc.querySelectorAll(HOSTS)) hosts.push(h);
+    // Hosts nest. A watch page's real chain is
+    // ytd-watch-next-secondary-results-renderer > ytd-item-section-renderer,
+    // and both names are in HOSTS, so one video is reachable through two of
+    // them. Without this, every sidebar video was visited twice - six visits
+    // for three videos - and a visitor that had not yet attached its strip
+    // would attach a second one, doubling the readings on the page.
+    //
+    // Identity, not id: two distinct cards for one video are two cards and both
+    // deserve a strip, while one card reached twice is one card.
+    const done = new Set();
     for (const host of hosts) {
       for (const tile of host.querySelectorAll(TILES)) {
         if (seen >= cap) return;
+        if (done.has(tile)) continue;
         if ((skipLined && isLined(tile)) || tile.closest(ADS)) continue;
         const id = videoId(tile);
         if (!id) continue;
+        done.add(tile);
         seen++;
         if (visit(tile, id) === false) return;
       }

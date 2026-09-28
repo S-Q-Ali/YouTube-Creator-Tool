@@ -70,31 +70,51 @@ measurement is taken once in the browser and written to a custom property.
   visible and what height it takes, and the viewport width at which YouTube
   stops showing the sidebar.
   *Accept:* one line in the console that answers all six, or a clear "no
-  sidebar here".
-  *Files:* `extension/content.js` (temporary), removed in S5.1.
-- [ ] **S0.2** Fold the answers into `extension/tests/fixtures/watch.html` so
-  the fixture stops being a guess, and record the measured tile height and
-  sidebar breakpoint in the "Resolved" section below.
-  *Accept:* the fixture matches what the browser reported.
+    sidebar here".
+  *Files:* `extension/lib/probe.js` (temporary), removed in SB5.1. Kept out of
+  `content.js` on purpose, so removal is a file delete and one manifest line
+  rather than surgery on the file that carries the product.
+- [x] **S0.2** Fold the answers into `extension/tests/fixtures/watch.html` so
+  the fixture stops being a guess, and record the measurements in the "Resolved"
+  section below.
+  *Accept:* the fixture matches what the browser reported. Done - and the fixture
+  was wrong in four places, one of which was hiding a live double-visit bug in
+  `each()`. See Resolved.
 
 ### Checkpoint: SB0
 
-- [ ] The real insertion point is known, and it is written down.
-- [ ] Human review: the measurement looks like a video card, not a typo.
+- [x] The real insertion point is known, and it is written down. `div#contents`,
+  before the first `yt-lockup-view-model`, below the list's own `div#header`.
+- [x] The insertion was verified to displace a video, not merely to be visible:
+  `works=true`.
+- [x] The one unit the plan got wrong is corrected: pitch, not height.
+- [ ] The sidebar breakpoint is still unmeasured - a second run at a narrower
+  width. Deferred to SB4.2, where a browser is needed anyway; the design does
+  not depend on the exact number.
 
 ### Phase SB1: Placement as a tested function
 
 - [ ] **S1.1** `extension/lib/placement.js` exporting `sidebarSlot(doc)` (the
   node to insert before, or null) and `placementFor({ doc, pathname, width })`
   (a descriptor: `sidebar`, `drawer`, `mobile`, or `none`).
-  *Test:* `placement.test.mjs` against the fixture - sidebar present returns
-  the container's first child slot; no sidebar returns null; each of the three
+  *Sharpened after S0.* "The node to insert before" is not the first child of
+  the container - the list has a `div#header` holding the "Up next" heading as
+  its first child, so prepending puts the card above YouTube's own heading,
+  where it reads as their chrome. The slot is the first **tile**, and the header
+  is left above it. The fixture now carries the header so this is a test
+  failure rather than a note nobody reads.
+  *Test:* `placement.test.mjs` against the fixture - the slot is the first
+  `yt-lockup-view-model`, with `div#header` still ahead of it; no sidebar returns
+  null; each of the three
   breakpoints maps to its descriptor.
   *Dependencies:* S0.2. *Scope:* Small.
 - [ ] **S1.2** `mountHost` gains an in-flow mode. The card stops being
   `position: fixed` with `right`/`top`/`z-index` and stops being appended to
-  `document.body`; it is appended to the slot from S1.1. The search and channel
+  `document.body`; it is inserted at the slot from S1.1. The search and channel
   panels keep the fixed mode - they are not part of this change.
+  *Note from S0:* the card host is appended to a YouTube container, so it
+  inherits nothing and must carry its own width. `#secondary-inner` is 320px and
+  the host must fill it rather than assume 300px.
   *Test:* a card host carries no `position: fixed` and no `z-index`; a search
   host still carries both.
   *Dependencies:* S1.1. *Scope:* Small.
@@ -105,12 +125,21 @@ measurement is taken once in the browser and written to a custom property.
 
 ### Phase SB2: Push exactly two videos down
 
-- [ ] **S2.1** The card's height cap is `2 x` the measured compact-renderer
-  height, published as `--ns-tile-h` and consumed as
-  `calc(var(--ns-tile-h) * 2)`. The measurement comes from S0 and is applied as
-  a custom property on the host.
-  *Test:* the cap in `content.css` is expressed in tile heights, not a literal
-  pixel count, and a failing assertion names both numbers.
+- [ ] **S2.1** The card's height cap is **two measured tile pitches**, published
+  as `--ns-tile-pitch` and consumed as `calc(var(--ns-tile-pitch) * 2)`.
+  *Corrected after S0.* The plan originally said two tile *heights*, and the
+  measurement says that is wrong: a 40px probe displaced the list by 48px, so
+  each video occupies 122px - 114px of card plus 8px of gap. Two heights would
+  have pushed 1.97 videos and looked correct while being off. Pitch is measured
+  as the distance from one tile's top to the next one's, which includes the gap
+  by construction, and is re-measured on layout change rather than baked in as
+  the 122 it happens to be today. *That last part is the real fix:* a constant
+  would be right until YouTube changed a margin, and then the card would be
+  quietly wrong in a way no assertion catches.
+  *Test:* the cap in `content.css` is expressed in pitches, never a literal
+  pixel count; a fixture with a different tile height and a different gap
+  produces a different cap, which is the assertion that would have caught the
+  original mistake.
   *Dependencies:* S1.2. *Scope:* Small.
 - [ ] **S2.2** Readings become a two-column grid at sidebar width, one column
   below the mobile breakpoint. This is what makes S2.1 reachable.
@@ -194,6 +223,64 @@ measurement is taken once in the browser and written to a custom property.
 - [ ] It survives a sidebar re-render and obeys its close button.
 - [ ] Four viewport widths checked in both themes.
 - [ ] `theme.test.mjs`, `placement.test.mjs` and the full suite green.
+
+## Resolved: what the live page actually says
+
+Measured 2026-09-28 on a real watch page, viewport 1026×730, after the list
+settled. Committed as `extension/lib/probe.js` (temporary, removed in SB5.1).
+
+| Question | Answer |
+| --- | --- |
+| Where does the up-next list live? | `div#contents`, inside `ytd-item-section-renderer` inside `div#items` inside `ytd-watch-next-secondary-results-renderer` |
+| What is one video tall? | **114px**, identical across 26 tiles, margin 0 |
+| Does the gap between videos exist? | **8px** - a 40px probe displaced the list by 48px |
+| Is a plain inserted `<div>` visible? | **Yes.** `works=true`, pushed the first video down |
+| Which element does the scan match? | `#secondary-inner` (320px wide), not the renderer |
+| Does the list have its own header? | **Yes** - `div#header` is the first child of `div#contents` |
+| How long does the list take to settle? | 4.2s, 26 tiles |
+
+Three of these contradicted the plan, and two of the three were the plan's
+fault rather than the page's:
+
+**The unit is pitch, not height.** The plan said the cap would be
+`2 × tile height`. The measurement says a video *occupies* 122px - 114px of card
+plus 8px of gap - so `2 × height` would have pushed 1.97 videos, not 2. The cap
+is now written against the measured distance from one tile's top to the next,
+which includes the gap by construction and cannot drift if YouTube changes its
+margin. SB2.1 is rewritten accordingly; the `calc(var(--ns-tile-h) * 2)` draft
+would have been subtly wrong forever, in a way no test could have caught.
+
+**Inserting into the list is ambiguous, and one reading is wrong.** The list has
+a `div#header` holding the "Up next" heading as its first child. "Prepend to the
+list" puts the card *above* the heading, where it reads as YouTube's own chrome.
+"Insert before the first tile" puts it under the heading, which is right. These
+are different instructions and the phrase in S1.2 did not distinguish them. The
+fixture now carries the header so the difference is testable rather than
+noted.
+
+**The guessed fixture was hiding a live bug.** The old fixture put the tiles
+directly in `#contents` with no nesting, so no video was reachable through two
+hosts. The real chain nests `ytd-item-section-renderer` inside
+`ytd-watch-next-secondary-results-renderer`, and both are in `HOSTS`, so every
+sidebar video was being visited **twice** - six visits for three videos. A
+visitor that had not yet attached its strip would attach a second one, doubling
+the readings on the page. Fixed in `each()` by tracking visited tiles, with a
+test that fails without the fix. The lesson generalises past this file: a
+fixture is a claim about a foreign system, and the parts of it that are easiest
+to get wrong are the parts that never fail a test written beside them.
+
+**Still unknown: the breakpoint.** Reading the media widths out of YouTube's
+stylesheets returned `none-readable` - the rules live in shadow roots and
+adopted sheets, which a content script cannot reach. So the sidebar breakpoint
+is still to be found by a second run at a narrower width, at 1026px the sidebar
+is present and 320px wide. S1.1 takes the width as an input and S4.2 confirms
+it in a browser, so the unknown is a constant to be measured, not a risk to the
+design.
+
+**Unrelated, confirmed twice:** the `Expected arc flag` errors in the console are
+YouTube's own paths. Ours are `a2 2 0 0 0 2 2` with seven operands; the failing
+one has six and ends `2 2` where `2-2v-2` belongs. The ad CORS failures, the
+preload warnings and the `powerPreference` notice are all YouTube's too.
 
 ## Risks and Mitigations
 

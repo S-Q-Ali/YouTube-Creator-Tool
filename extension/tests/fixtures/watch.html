@@ -1,17 +1,51 @@
 <!doctype html>
 <!--
-  A trimmed copy of a real YouTube watch page.
+  A trimmed copy of a real YouTube watch page, rewritten after Phase SB0
+  measured the live one.
 
-  The reason this fixture exists: the strip was deliberately kept off watch
-  pages, on the grounds that "a strip never lands on the watch page or on the
-  hero of the page you opened". That was right about the hero and wrong about
-  the sidebar - the up-next list is made of the same compact cards as a grid,
-  so leaving it out meant the user got stats everywhere except the one place
-  they are deciding what to watch next.
+  The first version of this fixture was a guess, and the guess was wrong in
+  four ways. Each is recorded here because the fix is not obvious from the
+  markup alone:
 
-  So scanning on a watch page has to be scoped to the sidebar, and the trap in
-  #primary is here to prove the scope holds: a tile in the hero area must never
-  get a strip, even though it is a perfectly valid lockup with a watch link.
+  1. The tiles are yt-lockup-view-model, not ytd-compact-video-renderer. YouTube
+     migrated the watch page's related list, the home feed and channel grids to
+     the lockup element; the old name survives only on search results. A
+     selector written against the guess found nothing on a live page, and the
+     probe built for the fix went looking for a tile that was never coming.
+  2. The chain has two more levels than assumed. The real path is
+
+       div#related
+         > ytd-watch-next-secondary-results-renderer
+           > div#items
+             > ytd-item-section-renderer
+               > div#contents            <- rows live here
+                 > div#header            <- the list's own heading
+                 > yt-lockup-view-model  <- the tiles
+
+     The fixture went straight from the renderer to div#contents, skipping
+     #items and ytd-item-section-renderer. So a card inserted "into the list"
+     would land one level too high in the real page - above the list's own
+     header, looking like it belonged to YouTube's chrome.
+  3. div#contents has a div#header as its first child, holding the "Up next"
+     heading. The measured live page reported 27 children for 26 tiles: 26
+     videos and one header. So "insert before the first tile" and "prepend to
+     the list" are different instructions, and only the first is right. The
+     card belongs under the heading, not above it.
+  4. The sidebar is matched by #secondary-inner, not by the renderer. Both are
+     in NS_TILES.SIDEBAR and querySelector returns whichever comes first in
+     document order, which is #secondary-inner at 320px wide. Measuring the
+     renderer instead would report a different element than the one the
+     shipped scan uses.
+
+  Measured on the live page, 26 tiles settled over 4.2s, viewport 1026x730:
+  every tile 114px tall, no margin, row container div#contents, insertion
+  before the first tile pushed the first video down by 48px for a 40px probe -
+  so the gap between two tiles is 8px and the unit "one video" occupies is a
+  pitch, not a height. See tasks/sidebar-plan.md, Resolved.
+
+  The #primary hero is still here for the reason it was always here: it is a
+  perfectly valid lockup with a watch link, and scanning a watch page must
+  never touch it.
 -->
 <ytd-watch-masthead id="masthead">
   <div id="primary">
@@ -26,26 +60,35 @@
   </div>
 
   <div id="secondary">
-    <ytd-watch-next-secondary-results-renderer>
-      <div id="contents">
-        <ytd-compact-video-renderer id="up1">
-          <a href="/watch?v=UpNext0000001">First up next</a>
-          <h3>First up next</h3>
-        </ytd-compact-video-renderer>
-        <ytd-compact-video-renderer id="up2">
-          <a href="/watch?v=UpNext0000002&amp;pp=abc">Second up next</a>
-          <h3>Second up next</h3>
-        </ytd-compact-video-renderer>
-        <ytd-ad-slot-renderer id="ad">
-          <ytd-compact-video-renderer>
-            <a href="/watch?v=AdVideo000001">Sponsored</a>
-          </ytd-compact-video-renderer>
-        </ytd-ad-slot-renderer>
-        <ytd-compact-video-renderer id="up3">
-          <a href="/watch?v=UpNext0000003">Third up next</a>
-          <h3>Third up next</h3>
-        </ytd-compact-video-renderer>
-      </div>
-    </ytd-watch-next-secondary-results-renderer>
+    <div id="secondary-inner" class="box">
+      <ytd-watch-next-secondary-results-renderer id="up-next">
+        <div id="items">
+          <ytd-item-section-renderer id="section">
+            <div id="contents">
+              <div id="header">
+                <h2>Up next</h2>
+              </div>
+              <yt-lockup-view-model id="up1">
+                <a href="/watch?v=UpNext0000001">First up next</a>
+                <h3>First up next</h3>
+              </yt-lockup-view-model>
+              <yt-lockup-view-model id="up2">
+                <a href="/watch?v=UpNext0000002&amp;pp=abc">Second up next</a>
+                <h3>Second up next</h3>
+              </yt-lockup-view-model>
+              <ytd-ad-slot-renderer id="ad">
+                <yt-lockup-view-model>
+                  <a href="/watch?v=AdVideo000001">Sponsored</a>
+                </yt-lockup-view-model>
+              </ytd-ad-slot-renderer>
+              <yt-lockup-view-model id="up3">
+                <a href="/watch?v=UpNext0000003">Third up next</a>
+                <h3>Third up next</h3>
+              </yt-lockup-view-model>
+            </div>
+          </ytd-item-section-renderer>
+        </div>
+      </ytd-watch-next-secondary-results-renderer>
+    </div>
   </div>
 </ytd-watch-masthead>

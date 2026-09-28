@@ -210,9 +210,7 @@ G0 changed no value.
 - [ ] W11.1: reload the extension, open a watch page, confirm the card is 300px
   wide, stops at the viewport edge and scrolls when the readings are long, and
   that the close button still works.
-- [ ] W11.2: confirm the up-next list now carries the same two-row strip as a
-  grid, that the video being watched has no strip on it, and that no ad slot
-  got one.
+- [ ] W11.2: confirm the up-next list now carries the same two-row strip as a grid, that the video being watched has no strip on it, and that no ad slot got one. The double-visit bug that would have put two strips on every sidebar video is fixed and covered by a test, but only a browser can confirm the strip lands once on a real tile.
 - [ ] W11.3: the card is about to stop being a fixed overlay and become the first item of the up-next list, so W11.1's overlay check is superseded by Phase SB below. W11.2 still stands.
 
 ## Phase SB: Card in the up-next sidebar
@@ -222,11 +220,11 @@ videos, in normal flow, with no `z-index`, and responsive. Different work from
 the glass restyle; the two meet at G2, which gives this box its glass surface.
 (Named SB, not S: the older "Phase S" above is Style V2 and keeps that name.)
 
-- [ ] S0.1: one-shot probe - which sidebar selector matched, the first compact renderer's parent and its computed display/overflow, one tile's measured height, whether an inserted `div` is visible, and the width at which YouTube drops the sidebar. One console line, read before anything is built.
-- [ ] S0.2: fold the answers into `extension/tests/fixtures/watch.html` so the fixture stops being a guess, and record the measured tile height and the sidebar breakpoint in the plan's Resolved section
-- [ ] S1.1: `extension/lib/placement.js` - `sidebarSlot(doc)` and `placementFor({doc, pathname, width})`, tested against the fixture at each breakpoint
-- [ ] S1.2: `mountHost` gains an in-flow mode; the card loses `position:fixed`, `right`, `top` and `z-index` and stops being appended to `body`. The search and channel panels keep the fixed mode.
-- [ ] S2.1: the card's height cap is `calc(var(--ns-tile-h) * 2)` - two measured tile heights, not a guessed pixel count
+- [x] S0.1: one-shot probe - which sidebar selector matched, the first tile's parent and its computed display/overflow, one tile's measured height, whether an inserted `div` is visible, and the width at which YouTube drops the sidebar. One console line, read before anything is built. Ran three times; the first two reported the page as broken when the probe was the thing at fault.
+- [x] S0.2: fold the answers into `extension/tests/fixtures/watch.html` so the fixture stops being a guess, and record the measurements in the plan's Resolved section. Found the real chain, the 114px tile, the 8px gap, the list's own `div#header` - and a live double-visit bug in `each()` that the wrong fixture had been hiding.
+- [ ] S1.1: `extension/lib/placement.js` - `sidebarSlot(doc)` and `placementFor({doc, pathname, width})`, tested against the fixture at each breakpoint. The slot is the first **tile**, not the container's first child: the list has a `div#header` with the "Up next" heading, and prepending puts the card above it.
+- [ ] S1.2: `mountHost` gains an in-flow mode; the card loses `position:fixed`, `right`, `top` and `z-index` and stops being appended to `body`. The search and channel panels keep the fixed mode. The host now lives inside YouTube's container and must carry its own width - `#secondary-inner` is 320px.
+- [ ] S2.1: the card's height cap is `calc(var(--ns-tile-pitch) * 2)` - two measured **pitches** (top of one tile to top of the next), not heights. A video occupies 122px: 114 of card plus 8 of gap, so two heights would have pushed 1.97 videos and looked right. Re-measured on layout change, not baked in.
 - [ ] S2.2: readings become a two-column grid at sidebar width, one column below the mobile breakpoint. This is what makes S2.1 reachable.
 - [ ] S2.3: tags and the coach replace the readings in place instead of appending below, so nothing pushes the list past its cap
 - [ ] S3.1: re-insert when YouTube re-renders the sidebar; the mount is idempotent, never two cards
