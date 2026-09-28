@@ -75,4 +75,20 @@ describe("annotating a card in place", () => {
     expect(globalThis.NS_TILES.isLined(card)).toBe(true);
     expect(collect(50).map((x) => x.id)).not.toContain("gEQ0BLyVJhY");
   });
+
+  it("hands a lined card back to a pass that asks for it", () => {
+    // The download icon rides the card's own hover overlay and is not part of the
+    // strip, so it must still find cards the strip pass has already marked.
+    const seen = [];
+    globalThis.NS_TILES.each(
+      document,
+      50,
+      (tile, id) => {
+        seen.push(id);
+      },
+      { skipLined: false }
+    );
+    expect(seen).toContain("gEQ0BLyVJhY");
+    expect(seen).toContain("aBcDeFgHiJk");
+  });
 });

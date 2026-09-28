@@ -52,14 +52,20 @@
   }
 
   /* Hands each annotatable card to `visit` once, until the budget runs out or a
-     visitor returns false because the page moved on underneath it. */
-  function each(doc, limit, visit) {
+     visitor returns false because the page moved on underneath it.
+
+     Cards that already carry a strip are skipped, because the strip is the
+     point of that pass. A second pass with a different job — the download icon
+     that lives on the card's own hover overlay — must not be held hostage to
+     the strip's state, so it asks for lined cards back with `skipLined: false`. */
+  function each(doc, limit, visit, opts) {
+    const skipLined = !opts || opts.skipLined !== false;
     let seen = 0;
     const cap = limit > 0 ? limit : Infinity;
     for (const host of doc.querySelectorAll(HOSTS)) {
       for (const tile of host.querySelectorAll(TILES)) {
         if (seen >= cap) return;
-        if (isLined(tile) || tile.closest(ADS)) continue;
+        if ((skipLined && isLined(tile)) || tile.closest(ADS)) continue;
         const id = videoId(tile);
         if (!id) continue;
         seen++;

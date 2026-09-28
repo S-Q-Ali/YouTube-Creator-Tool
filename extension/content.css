@@ -37,3 +37,48 @@
     transition: none;
   }
 }
+
+/* The hover icon is a card control, so it borrows YouTube's overlay-button
+   language — white glyph, circular hit area, same scale as the buttons it sits
+   under — and adds only a focus ring of our own. It must stay clickable, which
+   is the opposite of the strip above. */
+.ns-ovl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: background 120ms ease-out, transform 120ms ease-out;
+}
+
+.ns-ovl-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.ns-ovl-btn:active {
+  transform: scale(0.92);
+}
+
+.ns-ovl-btn:focus-visible {
+  outline: 2px solid var(--ns-cyan);
+  outline-offset: 2px;
+}
+
+.ns-ovl-btn[data-state="saving"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-ovl-btn {
+    transition: none;
+  }
+}

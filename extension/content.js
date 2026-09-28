@@ -171,6 +171,7 @@ function ensurePrefs() {
     if (res && res.ok && res.data) {
       prefs = mergePrefs(res.data);
       routeOverlays();
+      scanHoverIcons();
       scanTiles();
     }
   });
@@ -617,19 +618,24 @@ function setThumbState(text) {
   if (item) item.classList.toggle("ns-thumb-item--busy", !!text);
 }
 
+/* One place that asks the background worker to save an image, so the watch menu
+   and the card icon cannot drift apart on payload shape or error reporting. */
+function saveThumb(payload, done) {
+  chrome.runtime.sendMessage({ type: "thumb:download", urls: payload.urls, filename: payload.filename }, (res) => {
+    const bad = chrome.runtime.lastError || !res || !res.ok;
+    if (bad) console.warn("[niche-scope] thumbnail download failed:", (res && res.error) || chrome.runtime.lastError);
+    done(!bad);
+  });
+}
+
 function downloadWatchThumb() {
   const id = watchThumb.id || currentVideoId();
   const filename = NS_THUMB.filename(watchThumb.title, id);
   const urls = NS_THUMB.candidates(id, watchThumb.thumbnailUrl);
   if (!filename || urls.length === 0) return;
   setThumbState("Saving...");
-  chrome.runtime.sendMessage({ type: "thumb:download", urls, filename }, (res) => {
-    if (chrome.runtime.lastError || !res || !res.ok) {
-      console.warn("[niche-scope] thumbnail download failed:", (res && res.error) || chrome.runtime.lastError);
-      setThumbState("Could not save");
-    } else {
-      setThumbState("Saved");
-    }
+  saveThumb({ urls, filename }, (ok) => {
+    setThumbState(ok ? "Saved" : "Could not save");
     setTimeout(() => setThumbState(null), 2600);
   });
 }
@@ -792,6 +798,50 @@ function scanTiles() {
     if (gridMem.has(id)) applyModel(id, gridMem.get(id));
     else queueUpgrade(id);
   });
+}
+
+/* ---------------- Hover overlay: download this card's thumbnail ---------------- */
+
+/* The icon lives on the card's own hover row, right under the Volume and
+   Captions buttons, so it is a card control rather than another annotation. It
+   is not part of the strip: it shows in every data mode, it is built from the
+   DOM alone, and a press needs no server round trip because the title and the
+   image are already in the card. Cards whose overlay we cannot find are left
+   exactly as YouTube drew them. */
+function cardTitle(tile) {
+  const el = tile.querySelector("h3[title], h3 a[title], h3 a, h3, a#video-title, #video-title");
+  if (!el) return "";
+  return (el.getAttribute("title") || el.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function cardImage(tile) {
+  const img = tile.querySelector("ytd-thumbnail img[src], img.yt-core-image[src], img[src]");
+  return img ? img.getAttribute("src") : "";
+}
+
+function mountHoverIcon(tile, id) {
+  if (tile.querySelector("[data-ns-ovl]")) return;
+  // The card, its grid wrapper and the thumbnail itself are all too big to be a
+  // neighbour: the icon has to land inside the overlay, not below the image.
+  const unsafe = [tile, tile.closest(NS_TILES.HOSTS), tile.querySelector("ytd-thumbnail")].filter(Boolean);
+  const anchor = NS_THUMB.findAnchor(tile, unsafe);
+  if (!anchor || !anchor.parentNode) return;
+
+  const btn = NS_THUMB.buildHoverButton(id, cardTitle(tile), cardImage(tile), (payload) => {
+    NS_THUMB.setState(btn, "saving");
+    saveThumb(payload, (ok) => {
+      NS_THUMB.setState(btn, ok ? "saved" : "failed");
+      setTimeout(() => NS_THUMB.setState(btn, null), 2600);
+    });
+  });
+  anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+}
+
+function scanHoverIcons() {
+  if (!gridPage()) return;
+  NS_TILES.each(document, prefs.tileLimit || 60, (tile, id) => {
+    mountHoverIcon(tile, id);
+  }, { skipLined: false });
 }
 
 /* --------------------- Tier 1: upgrade the painted line --------------------- */
@@ -1132,7 +1182,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   prefs = mergePrefs(changes[PREFS_KEY].newValue);
   routeOverlays();
   // Density and card data both change what a line says, so redraw every line
-  // rather than guess which preference the change was about.
+  // rather than guess which preference the change was about. The hover icon is
+  // not part of the strip, so it stays where it is.
   if (prefs.dataMode !== before) {
     stripLines();
     scanTiles();
@@ -1152,6 +1203,7 @@ function stripLines() {
 }
 
 function onDomChange() {
+  scanHoverIcons();
   scanTiles();
 }
 
@@ -1160,6 +1212,7 @@ function init() {
   console.log("[niche-scope] content script ready:", location.href);
   ensurePrefs();
   routeOverlays();
+  scanHoverIcons();
   scanTiles();
 
   observer = new MutationObserver(() => {

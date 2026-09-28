@@ -1,0 +1,71 @@
+<!--
+  Trimmed copy of a hovered YouTube card. Two shapes of the same overlay, because
+  the placement rule has to survive both:
+
+  card-1  the pair sits in one box (ytp-*-toggle-button)  -> anchor is that box
+  card-2  no overlay classes, labels only                  -> anchor found by label
+  card-3  nothing to hang under                             -> no button at all
+  grid   the real nesting, for the end-to-end placement test
+-->
+<ytd-rich-grid-renderer>
+  <ytd-rich-item-renderer>
+    <yt-lockup-view-model content-id="dQw4w9WgXcQ">
+      <a href="/watch?v=dQw4w9WgXcQ">
+        <ytd-thumbnail>
+          <img class="yt-core-image" src="https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/hq720.webp" />
+          <div class="overlay">
+            <div class="pair">
+              <button class="ytp-mute-toggle-button" aria-label="Mute"></button>
+              <button class="ytp-caption-toggle-button" aria-label="Subtitles on"></button>
+            </div>
+          </div>
+        </ytd-thumbnail>
+        <h3 title="The first card in a real grid">
+          <a href="/watch?v=dQw4w9WgXcQ">The first card in a real grid</a>
+        </h3>
+      </a>
+    </yt-lockup-view-model>
+  </ytd-rich-item-renderer>
+</ytd-rich-grid-renderer>
+<ytd-rich-item-renderer>
+  <a id="thumbnail-1" href="/watch?v=8sA8Y5F3p9M">
+    <ytd-thumbnail>
+      <img src="https://i.ytimg.com/vi_webp/8sA8Y5F3p9M/hq720.webp" />
+      <div class="overlay">
+        <div class="pair">
+          <button class="ytp-mute-toggle-button" aria-label="Mute"></button>
+          <button class="ytp-caption-toggle-button" aria-label="Subtitles on"></button>
+        </div>
+        <button class="more" aria-label="Action menu"></button>
+      </div>
+    </ytd-thumbnail>
+    <h3 title="How I plan a month of uploads"><a href="/watch?v=8sA8Y5F3p9M">How I plan a month of uploads</a></h3>
+  </a>
+</ytd-rich-item-renderer>
+
+<ytd-rich-item-renderer>
+  <a id="thumbnail-2" href="/watch?v=2Kq9TbZ4wXc">
+    <ytd-thumbnail>
+      <img src="https://i.ytimg.com/vi/2Kq9TbZ4wXc/hqdefault.jpg" />
+      <div class="overlay">
+        <button aria-label="Volume"><span class="ico"></span></button>
+        <button aria-label="Captions on"></button>
+        <button aria-label="Action menu"></button>
+      </div>
+    </ytd-thumbnail>
+    <h3 title="Three settings nobody explains"><a href="/watch?v=2Kq9TbZ4wXc">Three settings nobody explains</a></h3>
+  </a>
+</ytd-rich-item-renderer>
+
+<!-- Nothing but the menu: the icon has nowhere to go and must not appear. -->
+<ytd-rich-item-renderer>
+  <a id="thumbnail-3" href="/watch?v=7bR3yHn6mPd">
+    <ytd-thumbnail>
+      <img src="https://i.ytimg.com/vi/7bR3yHn6mPd/hqdefault.jpg" />
+      <div class="overlay">
+        <button aria-label="Action menu"></button>
+      </div>
+    </ytd-thumbnail>
+    <h3 title="A video with no hover controls"><a href="/watch?v=7bR3yHn6mPd">A video with no hover controls</a></h3>
+  </a>
+</ytd-rich-item-renderer>
