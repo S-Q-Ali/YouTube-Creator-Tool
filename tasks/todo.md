@@ -106,3 +106,17 @@ New readings, and where they come from: **subscribers** and the **outlier baseli
 - [x] U6: Extension 0.4.0 + README rewritten around the two-row block, the 2-unit page cost and the save action
 - [x] U7: Fixes found while wiring the above — a failed batch is retried instead of dropped, a video in two slots upgrades both lines, changing density repaints, an old `line` mode value upgrades to `full`
 - [ ] U8: Live check — block lands under the title on home/search/channel, the menu row appears under "Audio and captions", a save lands in the downloads folder at the best size, both themes
+
+## Phase V: The Card Says Only What It Cannot
+
+Decisions locked by the user, after looking at the real cards: the strip hangs **under the whole card** (not inside YouTube's metadata block), it says only `subscribers` / `views per hour` / `outlier score`, the **grade chip is gone** (the watch page keeps score and grade), and the thumbnail save moves onto the card itself as an icon **below the Volume and Captions buttons**. Data is **server-only** - the strip waits rather than guessing from a card's own text.
+
+- [x] V1: `extension/lib/lineModel.js` rewritten to three readings on two rows (`subscribers` / `views per hour` | `outlier score`), a value-class-title cell so the explanation lives in the hover text, and an explicit blank until the server answers; `fmtOutlierScore` + `outlierHint` added to `nsMeta.js`
+- [x] V2: `extension/lib/tiles.js` - which cards qualify, decided apart from the painting and tested against a real grid: only the inner `yt-lockup-view-model`, never the `ytd-rich-item-renderer` wrapper; ads and linkless tiles skipped; the strip is appended to the tile so it lands below the title
+- [x] V3: Server-only strip - the card's own text is no longer parsed, the runtime gap-fill and the compact mode are gone, the line separator is `|`, and the grid model carries only the four numbers the strip renders
+- [x] V4: Verdict chip removed end to end - overlay code, prefs (`showPills`, `pillLimit`), popup toggles and `.ns-pill*` CSS; the watch-page score and grade are untouched
+- [x] V5: `extension/lib/thumb.js` - the hover icon: prefer the language-independent overlay classes, fall back to the labels, never climb out of the thumbnail, and add nothing when there is no overlay; one place (`saveThumb`) asks the worker to save, so the watch menu and the card icon cannot drift
+- [x] V6: Extension 0.5.0, README and popup copy rewritten around the three readings and the new icon
+- [x] V7: The Tier 0 grid reader retired - `parse`/`velocity`/`parseViews`/`parseAge` had no caller left once the strip went server-only, and `lib/velocity.ts` is now the only velocity implementation
+- [ ] V8: Live check - strip lands under the card on home/search/channel, no reflow, no duplicates, no chip, the icon appears under Volume and Captions on hover and saves the file, both themes, reduced motion
+- [ ] V9: `NS_TOKENS` in `content.js` re-checked against `extension/ns-theme.css` (canonical)

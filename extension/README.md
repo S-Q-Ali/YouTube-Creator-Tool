@@ -1,18 +1,19 @@
 # Niche-Scope Chrome Extension (MV3)
 
-Overlays vidIQ-style scores, letter grades and views/hour (velocity) directly on
-youtube.com — powered by your local Niche-Scope server at `http://localhost:3000`.
+Overlays subscriber counts, views/hour (velocity) and an outlier score on
+youtube.com, and saves thumbnails from the card itself — powered by your local
+Niche-Scope server at `http://localhost:3000`.
 
 ## What it does
 
-- **Every card, always on**: home, search, channel, shorts and browse grids get a
-  quiet line of readings under the card's own metadata - no hovering, no clicking.
-  Row one is what the card cannot say (exact views, the real publish date,
-  subscribers); row two is what it means (views per hour, and how far the video
-  sits from what its channel usually gets). The line paints instantly from the
-  text YouTube already prints, then upgrades itself in place from the server.
-- **Thumbnails** (home, search, related, shorts): a small chip shows the grade
-  letter plus the score meter.
+- **Every card, quietly**: home, search, channel, shorts and browse grids get a
+  thin strip hung under the card itself - no hovering, no clicking. It says only
+  what the card cannot: subscribers on the first line, views per hour and the
+  outlier score on the second. YouTube's own channel, views and age are never
+  repeated. The strip waits for the server, so it never shows a guess.
+- **Thumbnails** (home, search, related, shorts): a **download** icon appears
+  under the card's own Volume and Captions buttons on hover, and saves the
+  thumbnail at the best size that exists.
 - **Watch pages**: a floating card in the top-right shows the video's SEO score,
   letter grade, views, channel subs, velocity, the 24h trend when it exists, and
   the actionable/performance split.
@@ -23,20 +24,18 @@ youtube.com — powered by your local Niche-Scope server at `http://localhost:30
 
 ## Card data, and what each mode shows
 
-`Card data` in the popup decides how much a card says. The rule is gaps-only: a
-reading appears on the line only when the card does not already show it, so the
-channel name and the approximate view count YouTube prints are never repeated.
+`Card data` in the popup decides whether the strip shows at all.
 
 | Mode | Card shows |
 |---|---|
-| `Off` | nothing on the line (chips still work) |
-| `Compact` | views per hour, and the outlier when the channel has enough history |
-| `Full` (default) | the above plus exact views, the absolute publish date, subscribers, and the runtime on cards whose own thumbnail has no runtime badge |
+| `Off` | no strip on the card |
+| `Full` (default) | `subscribers` on line one, `views/hr` and the outlier score on line two |
 
-An outlier reads as a sentence rather than a score: `3.4× usual`, `typical`, or
-`0.3× usual`. It is measured against the channel's own lifetime views per video,
-so it works for channels nobody has tracked, and the watch card prefers the
-average of the videos it has stored when it has one.
+The outlier reads as the score it is - `3.4×`, with the explanation in the hover
+text - because a card has no room for a sentence. It is measured against the
+channel's own lifetime views per video, so it works for channels nobody has
+tracked, and the watch card prefers the average of the videos it has stored when
+it has one.
 
 `Cards per pass` (24-100) caps how many cards a single DOM pass may touch, which
 keeps a fast scroll cheap; everything is picked up on the next pass.
@@ -44,10 +43,10 @@ keeps a fast scroll cheap; everything is picked up on the next pass.
 ## Overlay preferences
 
 The popup has an **Overlays on YouTube** section: toggle the watch-page card,
-thumbnail chips, search/channel research and the AI coach independently, then
-set card data, cards per pass and signals per pass. Preferences persist in
-`chrome.storage.local` (key `ns:prefs`) and the content script applies them live
-via `chrome.storage.onChanged` — no page reload needed.
+search/channel research and the AI coach independently, then set card data and
+cards per pass. Preferences persist in `chrome.storage.local` (key `ns:prefs`)
+and the content script applies them live via `chrome.storage.onChanged` — no page
+reload needed.
 
 ## Load it (unpacked)
 
@@ -55,7 +54,8 @@ via `chrome.storage.onChanged` — no page reload needed.
 2. Open `chrome://extensions`.
 3. Enable **Developer mode** (top-right).
 4. Click **Load unpacked** and select this `extension/` folder.
-5. Open YouTube home — every card should show a velocity reading.
+5. Open YouTube home — every card should show a strip, and hovering a card should
+   reveal the download icon under its Volume and Captions buttons.
 
 ## How it talks to your server
 
@@ -83,7 +83,7 @@ permission needed).
 
 | Endpoint | Used by |
 |---|---|
-| `POST /api/videos/grid` | card lines + thumbnail chips (batched, up to 50 ids) |
+| `POST /api/videos/grid` | the strip under every card (batched, up to 50 ids) |
 | `POST /api/videos/lookup` | watch card, search and channel research |
 | `GET /api/quota` | popup |
 | `GET /api/competitors` | popup |
@@ -101,9 +101,11 @@ Two different numbers, deliberately not conflated:
 ## Notes
 
 - Scores only appear for public videos (private/region-blocked videos error gracefully as `—`).
-- If the server is off, the line keeps its first-pass reading and the popup says “Server offline”.
-- The **Download thumbnail** row is only added when YouTube’s menu actually has an
-  Audio and captions row to sit under; on a menu layout we do not recognise the
-  item is skipped rather than drawn in the wrong place.
+- If the server is off the strip simply stays empty — it would rather say nothing
+  than guess — and the popup says “Server offline”.
+- The card’s **download** icon is only added when the card’s hover overlay can be
+  found; on an overlay layout we do not recognise it is skipped rather than drawn
+  in the wrong place. The **Download thumbnail** menu row on a watch page has the
+  same rule: it needs the site’s own Audio and captions row to sit under.
 - YouTube Studio has no overlays yet; that is Phase C.
 - No build step: plain JS/CSS/HTML, loaded unpacked.

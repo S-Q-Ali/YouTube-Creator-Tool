@@ -158,6 +158,27 @@ Upgrade the existing Niche-Scope Chrome extension (currently watch-card + thumbn
 - [ ] README updated (`extension/README.md`)
 - [ ] Human sign-off
 
+## Phase V: The Card Says Only What It Cannot (shipped, code complete)
+
+Phases A–D above are unchanged and still unchecked. Phase V reworked the two
+surfaces Phases T and U built, on the user's reading of the real cards:
+
+- The strip hangs **under the whole card** rather than inside YouTube's metadata
+  block, and says only `subscribers` / `views per hour` / `outlier score` — the
+  channel, view count and age YouTube already prints are never repeated.
+- The **grade chip is removed**; the watch page keeps score, grade and meter.
+- The thumbnail save moves onto the card as an icon **below the Volume and
+  Captions buttons**, built from the DOM alone (no request: the title and the
+  image are already in the card).
+- The strip is **server-only**. A card that guesses is worse than a card that
+  waits, so the instant reader that parsed a card's own text is gone and
+  `lib/velocity.ts` is the only velocity implementation.
+- **Two quota units per 50 cards** is unchanged: one `videos.list`, one
+  `channels.list`.
+
+Tracked in `tasks/todo.md` as Phase V. Commits: `90cb146`, `d7b632f`, `412dd0f`,
+`5ec1a3d`, `0c994be`, plus the 0.5.0 docs commit.
+
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |------|--------|------------|
