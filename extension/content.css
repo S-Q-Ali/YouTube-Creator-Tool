@@ -34,20 +34,10 @@
   box-shadow: 0 0 0 1px rgba(60, 200, 222, 0.35);
 }
 
-/* The line flows in the card's own metadata block, so it must never eat
-   clicks meant for the video. Duration is only added when the card's own
-   thumbnail has no runtime badge, which is what the .ns-line-dur class
-   (applied by the content script) marks. */
+/* The strip sits outside YouTube's clickable card content, but it lives in the
+   same shadow tree, so it still must never eat a click meant for the video. */
 .ns-line {
   pointer-events: none;
-}
-
-.ns-line-dur {
-  display: none;
-}
-
-.ns-line[data-show-dur="1"] .ns-line-dur {
-  display: inline;
 }
 
 /* The save-thumbnail row lives inside YouTube's own menu, so it borrows the

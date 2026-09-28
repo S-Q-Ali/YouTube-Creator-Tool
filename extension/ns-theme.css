@@ -52,17 +52,20 @@
 
 /* ------------------------- Always-on grid data line ------------------------- */
 
-/* One quiet line of readings under a card's own metadata. No box, no rule:
-   the number is the identity, the separators are a whisper, amber is reserved
-   for momentum and cyan for rate. */
+/* The strip hangs below the card, not inside it. A hairline at 10% keeps it
+   reading as an annotation on YouTube's own row rather than a second card, and
+   the numbers are the identity: a hairline separator, cyan for rate, amber for
+   momentum. */
 .ns-line {
   display: block;
-  margin-top: 2px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--ns-hair);
   font-family: var(--ns-font-read);
-  font-size: 12px;
+  font-size: 11.5px;
   font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--ns-mute);
 }
 
@@ -80,6 +83,10 @@
 
 .ns-line-row:empty {
   display: none;
+}
+
+.ns-line-subs {
+  color: var(--ns-ink);
 }
 
 .ns-line-v {

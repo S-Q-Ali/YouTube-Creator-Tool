@@ -4,12 +4,6 @@
  * card (score + tags + AI coach), search-page keyword panel, channel research
  * card. */
 
-const NS_LINE_TILE = "yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, ytd-playlist-video-renderer";
-const NS_LINE_LINK = 'a[href*="/watch?v="], a[href*="/shorts/"], a[href*="/live/"], a[href*="youtu.be/"]';
-const NS_LINE_META = ".yt-content-metadata-view-model__metadata-line, #metadata-line, #metadata, ytd-video-meta-renderer, .yt-content-metadata-view-model";
-const NS_LINE_DURATION_BADGE =
-  "ytd-thumbnail-overlay-time-status-renderer, .yt-thumbnail-overlay-time-status-renderer, .badge-shape-wiz__thumbnail-badge, [class*='TimeStatus'], [class*='time-status']";
-
 /* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
 const NS_TOKENS = `
 :host {
@@ -161,7 +155,7 @@ function api(path, opts) {
 }
 
 const DEFAULT_PREFS = { showCard: true, showPills: true, pillLimit: 24, showResearch: true, showCoach: true, dataMode: "full", tileLimit: 60 };
-const DATA_MODES = ["off", "compact", "full"];
+const DATA_MODES = ["off", "full"];
 const PREFS_KEY = "ns:prefs";
 let prefs = { ...DEFAULT_PREFS };
 
@@ -185,14 +179,7 @@ function ensurePrefs() {
 }
 
 function videoIdFromHref(href) {
-  try {
-    const u = new URL(href, location.href);
-    if (u.pathname === "/watch") return u.searchParams.get("v");
-    const m = u.pathname.match(/^\/(?:shorts|embed)\/([\w-]{6,})/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
+  return NS_TILES.idFromHref(href, location.href);
 }
 
 function gradeOf(score) {
@@ -722,11 +709,11 @@ function watchThumbMenu() {
 
 /* ------------------------- Always-on grid data line ------------------------- */
 
-/* Painted twice: once from the text YouTube already shows (no request), then
-   upgraded in place from /api/videos/grid. Scoped to grid routes so a line
-   never lands on the watch page or on the hero of the page you opened. */
+/* Painted on every card of a grid route, then filled in place from
+   /api/videos/grid. Scoped to grid routes so a strip never lands on the watch
+   page or on the hero of the page you opened. Which cards qualify lives in
+   lib/tiles.js. */
 
-const NS_GRID_HOSTS = "ytd-rich-grid-renderer, ytd-section-list-renderer, ytd-item-section-renderer, ytd-browse[page-subtype='channels'], ytd-browse[page-subtype='playlists']";
 const linedTiles = new WeakSet();
 const tileRows = new Map();
 let linesPass = 0;
@@ -737,44 +724,34 @@ function gridPage() {
   return p === "/" || p.startsWith("/results") || p.startsWith("/feed") || /^\/@/.test(p) || p.startsWith("/channel/") || p.startsWith("/c/") || p.startsWith("/browse/");
 }
 
-function findLineText(tile) {
-  const el = tile.querySelector(NS_LINE_META);
-  return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
-}
-
-function lineCell(text, className) {
+function lineCell(text, className, title) {
   const cell = document.createElement("span");
   cell.className = className;
   cell.textContent = text;
+  if (title) cell.title = title;
   return cell;
 }
 
 function lineSep() {
-  return lineCell("·", "ns-line-sep");
+  return lineCell("|", "ns-line-sep");
 }
 
 function paintRow(row, cells) {
   while (row.firstChild) row.removeChild(row.firstChild);
   for (let i = 0; i < cells.length; i++) {
     if (i > 0) row.append(lineSep());
-    row.append(lineCell(cells[i][0], cells[i][1]));
+    row.append(lineCell(cells[i][0], cells[i][1], cells[i][2]));
   }
 }
 
-/* Replace the readings in place; a tile never grows, shrinks or reflows twice.
+/* Replace the readings in place; a card never grows, shrinks or reflows twice.
    The wording is decided and tested in lib/lineModel.js; this only paints it. */
 function fillLine(row, model) {
   const line = row.line;
-  const built = NS_LINE_MODEL.build({
-    mode: prefs.dataMode,
-    facts: row.tier0 || {},
-    model,
-    hasDurationBadge: row.hasDurationBadge
-  });
+  const built = NS_LINE_MODEL.build({ mode: prefs.dataMode, model });
 
   paintRow(line.children[0], built.ctx);
   paintRow(line.children[1], built.judge);
-  line.setAttribute("data-show-dur", built.showDur ? "1" : "0");
   line.classList.toggle("ns-line--blank", built.blank);
 }
 
@@ -790,52 +767,33 @@ function buildLine() {
   return line;
 }
 
+/* The strip hangs off the card itself, below the title block, so it reads as an
+   annotation on a card rather than another line YouTube wrote. Which cards
+   qualify — and the nesting that used to give a video two of them — belongs to
+   lib/tiles.js, which is tested against a real grid. */
 function scanTiles() {
   if (prefs.dataMode === "off" || !gridPage()) return;
   linesPass++;
   const pass = linesPass;
   const budget = prefs.tileLimit || 60;
-  const hosts = document.querySelectorAll(NS_GRID_HOSTS);
-  const tiles = [];
-  for (const host of hosts) {
-    for (const tile of host.querySelectorAll(NS_LINE_TILE)) {
-      if (tiles.length >= budget) break;
-      if (tile.closest("ytd-ad-slot-renderer, ytd-promoted-sparkles-web-renderer")) continue;
-      if (tile.querySelector(".ns-line")) continue;
-      tiles.push(tile);
-    }
-  }
-  for (const tile of tiles) {
-    if (pass !== linesPass) return;
-    const link = tile.querySelector(NS_LINE_LINK);
-    const id = link && videoIdFromHref(link.getAttribute("href"));
-    const text = findLineText(tile);
-    if (!id || !text) continue;
-    const facts = NS_META.parse(text);
-    if (facts.views == null) continue;
+
+  NS_TILES.each(document, budget, (tile, id) => {
+    if (pass !== linesPass) return false;
+
     const line = buildLine();
-    const meta = tile.querySelector(NS_LINE_META) || link;
-    meta.parentNode.insertBefore(line, meta.nextSibling);
+    tile.append(line);
+    tile.setAttribute(NS_TILES.MARK, "1");
     linedTiles.add(tile);
-    const row = {
-      line,
-      tier0: facts,
-      hasDurationBadge: !!tile.querySelector(NS_LINE_DURATION_BADGE),
-      vph: null,
-      views: null,
-      durationSeconds: null,
-      vphDay: null,
-      spike: false
-    };
+    const row = { line, vph: null, views: null, durationSeconds: null, vphDay: null, spike: false };
     fillLine(row, row);
     // The same video can appear in more than one slot on a page; every one of
-    // those lines has to be upgraded, not just the first.
+    // those strips has to be filled, not just the first.
     const known = tileRows.get(id);
     if (known) known.push(row);
     else tileRows.set(id, [row]);
     if (gridMem.has(id)) applyModel(id, gridMem.get(id));
     else queueUpgrade(id);
-  }
+  });
 }
 
 /* --------------------- Tier 1: upgrade the painted line --------------------- */
@@ -1269,7 +1227,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
 function stripLines() {
   tileRows.clear();
   document.querySelectorAll(".ns-line").forEach((line) => {
-    if (line.parentNode) line.parentNode.removeChild(line);
+    const tile = line.parentNode;
+    if (!tile) return;
+    // The mark has to go with the strip, or the next pass would skip every
+    // card as already annotated and nothing would ever come back.
+    tile.removeAttribute(NS_TILES.MARK);
+    tile.removeChild(line);
   });
 }
 
