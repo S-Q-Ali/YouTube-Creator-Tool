@@ -193,6 +193,13 @@
   padding: 0;
 }
 
+/* The card's header meter. Only the card used this size; it lived in the
+   JavaScript copy of the stylesheet and nowhere else. */
+.ns-meter--xs {
+  height: 3px;
+  padding: 0;
+}
+
 /* ---------------------------------- Chip ----------------------------------- */
 
 .ns-chip {
@@ -224,7 +231,9 @@
   align-items: center;
   gap: 6px;
   font-family: var(--ns-font-read);
-  font-size: 20px;
+  /* 19px, not 20px: the shadow card said 19px and that is the size the card has
+     always rendered at. See "Resolved" in tasks/glass-plan.md. */
+  font-size: 19px;
   font-weight: var(--ns-w-read);
   font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
@@ -255,7 +264,8 @@
 
 .ns-strip .v {
   font-family: var(--ns-font-read);
-  font-size: 13px;
+  /* 12.5px, not 13px - the card's copy said 12.5px. See tasks/glass-plan.md. */
+  font-size: 12.5px;
   font-weight: var(--ns-w-read);
   font-variation-settings: "wght" var(--ns-w-read);
   font-variant-numeric: tabular-nums;
@@ -294,6 +304,333 @@
   border: 0;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* ------------------------------- Card surface ------------------------------ */
+/* Folded in from a stylesheet that was pasted into content.js. A shadow root
+   does not inherit the page's stylesheets, which is why that copy existed - but
+   it was maintained by hand, so it drifted from this file (the reading was 20px
+   here and 19px there, a strip value 13px against 12.5px, the entrance
+   animation was ns-enter in one and ns-open in the other), and the whole watch
+   card's visual language lived in only one of the two.
+   The shadow roots now adopt this file, so there is nothing left to keep in
+   step. extension/tests/theme.test.mjs fails if a class reappears in a script. */
+
+.ns-surface {
+  background: var(--ns-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ns-hair);
+  border-radius: 0;
+  color: var(--ns-ink);
+  font-family: var(--ns-font-ui);
+}
+
+.ns-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ns-head .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ns-amber);
+  flex: none;
+}
+.ns-head h1 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ns-ink);
+  flex: 1;
+}
+.ns-head .close {
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  color: var(--ns-mute);
+  line-height: 1;
+  padding: 2px 3px;
+}
+.ns-head .close:hover {
+  color: var(--ns-ink);
+}
+
+/* Layout-only wrappers, deliberately left as blocks. The card's children carry
+   their own margins, so a flex gap here would double every space up. Declared
+   only so the names the script uses resolve here rather than in a script. */
+.ns-card,
+.ns-body,
+/* Slots the script fills later: extras receives the tags and coach boxes, trend
+   receives a skeleton and then the search results. Neither styles its contents. */
+.ns-extras,
+.ns-trend {
+  display: block;
+}
+.ns-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ns-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 3px 0;
+}
+.ns-row .t {
+  font-size: 11.5px;
+  color: var(--ns-mute);
+}
+.ns-row .m {
+  width: 84px;
+}
+.ns-row .n {
+  font-family: var(--ns-font-read);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ns-ink);
+  width: 28px;
+  text-align: right;
+}
+
+.ns-btn {
+  font-family: var(--ns-font-ui);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ns-ink);
+  background: var(--ns-lift);
+  border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius);
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.ns-btn:hover {
+  border-color: var(--ns-amber);
+  color: var(--ns-amber);
+}
+.ns-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  border-color: var(--ns-hair);
+  color: var(--ns-mute);
+}
+.ns-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ns-foot {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ns-mute);
+}
+.ns-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ns-mute);
+  line-height: 1.55;
+}
+.ns-note--bad {
+  color: var(--ns-bad);
+}
+
+/* Keyword chips, and the research list they scroll to. */
+.ns-tags {
+  margin-top: 10px;
+  border-top: 1px solid var(--ns-hair);
+  padding-top: 8px;
+}
+.ns-taghead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.ns-taghead b {
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--ns-ink);
+}
+.ns-taghead span {
+  font-size: 11px;
+  color: var(--ns-mute);
+}
+.ns-tagwrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ns-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ns-ink);
+  background: var(--ns-lift);
+  border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius);
+  padding: 2px 6px;
+  cursor: copy;
+}
+.ns-tag:hover {
+  border-color: var(--ns-amber);
+}
+.ns-tag .ns-tagscore {
+  font-family: var(--ns-font-read);
+  font-size: 10px;
+  color: var(--ns-mute);
+  font-variant-numeric: tabular-nums;
+}
+.ns-tag.ns-add {
+  border-color: var(--ns-cyan);
+  color: var(--ns-cyan);
+}
+.ns-tag.ns-add .ns-tagscore {
+  color: var(--ns-cyan);
+}
+.ns-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ns-chipbtn {
+  font-size: 11px;
+  color: var(--ns-cyan);
+  background: var(--ns-lift);
+  border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.ns-chipbtn:hover {
+  border-color: var(--ns-cyan);
+}
+.ns-chipbtn.ns-q {
+  color: var(--ns-ink);
+}
+.ns-section-title {
+  font-size: 11.5px;
+  color: var(--ns-mute);
+  margin: 10px 0 4px;
+}
+
+.ns-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0 6px;
+}
+.ns-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--ns-ink);
+  border: 1px solid var(--ns-hair);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.ns-badge .bd {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.ns-badge.bt .bd {
+  background: var(--ns-amber);
+}
+.ns-badge.bo .bd {
+  background: var(--ns-cyan);
+}
+
+.ns-list {
+  margin-top: 6px;
+}
+.ns-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  text-decoration: none;
+}
+.ns-item + .ns-item {
+  border-top: 1px solid var(--ns-hair);
+}
+.ns-item:hover .ns-item-title {
+  color: var(--ns-amber);
+}
+.ns-item-title {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ns-ink);
+  flex: 1;
+}
+.ns-item .ns-item-v {
+  font-family: var(--ns-font-read);
+  font-size: 11px;
+  color: var(--ns-mute);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ns-coach {
+  margin-top: 10px;
+  border-top: 1px solid var(--ns-hair);
+  padding-top: 8px;
+}
+.ns-coach-q {
+  display: flex;
+  gap: 6px;
+}
+.ns-coach textarea {
+  flex: 1;
+  background: var(--ns-lift);
+  color: var(--ns-ink);
+  border: 1px solid var(--ns-hair);
+  border-radius: var(--ns-radius);
+  padding: 6px 8px;
+  font-family: var(--ns-font-ui);
+  font-size: 12px;
+  resize: vertical;
+  min-height: 40px;
+}
+.ns-coach textarea::placeholder {
+  color: var(--ns-mute);
+}
+.ns-coach textarea:focus {
+  outline: none;
+  border-color: var(--ns-amber);
+}
+.ns-answer {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ns-ink);
+  max-height: 260px;
+  overflow: auto;
+}
+
+.ns-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ns-skeleton span {
+  display: block;
+  height: 10px;
+  background: var(--ns-tick);
+  border-radius: 1px;
 }
 
 /* --------------------------------- Motion ---------------------------------- */

@@ -19,5 +19,11 @@
       "css": ["ns-theme.css", "content.css"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["ns-theme.css"],
+      "matches": ["*://www.youtube.com/*"]
+    }
   ]
 }

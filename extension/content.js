@@ -3,149 +3,43 @@
  * Surfaces: the strip under every grid card, watch-page card (score + tags +
  * AI coach), search-page keyword panel, channel research card. */
 
-/* Theme tokens mirror extension/ns-theme.css (canonical) — keep in sync. */
-const NS_TOKENS = `
-:host {
-  color-scheme: dark;
-  --ns-amber: #f0a500;
-  --ns-cyan: #3cc8de;
-  --ns-bad: #e4574f;
-  --ns-ink: #f2f5f8;
-  --ns-mute: #8a94a3;
-  --ns-lift: #141820;
-  --ns-glass: rgba(14, 17, 22, 0.78);
-  --ns-glass-solid: #141820;
-  --ns-hair: rgba(242, 245, 248, 0.1);
-  --ns-tick: rgba(242, 245, 248, 0.18);
-  --ns-radius: 2px;
-  --ns-motion: 140ms;
-  --ns-w-read: 600;
-  --ns-w-read-strong: 700;
-  --ns-font-read: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  --ns-font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-}
-:host([data-ns-theme="light"]) {
-  color-scheme: light;
-  --ns-amber: #9a6300;
-  --ns-cyan: #0d7a8f;
-  --ns-bad: #c0392b;
-  --ns-ink: #1d232b;
-  --ns-mute: #5b6472;
-  --ns-lift: #ffffff;
-  --ns-glass: rgba(255, 255, 252, 0.85);
-  --ns-glass-solid: #ffffff;
-  --ns-hair: rgba(29, 35, 43, 0.14);
-  --ns-tick: rgba(29, 35, 43, 0.22);
-}`;
+/* The component stylesheet used to be duplicated here as two strings - a token
+ * block and a component block - because a shadow root does not inherit the
+ * page's stylesheets. Both were maintained by hand and drifted from
+ * ns-theme.css: the reading was 19px here and 20px there, a strip value 12.5px
+ * against 13px, the entrance animation was ns-open here and ns-enter there, and
+ * the whole watch card's visual language existed only in this file. Tests
+ * recorded what had shipped, so the card's numbers won.
+ *
+ * Both strings are gone. The shadow roots adopt the real file, and the custom
+ * properties arrive for free: this host element carries data-ns-theme and lives
+ * in the page, and custom properties inherit across a shadow boundary.
+ * extension/tests/theme.test.mjs fails if any of this comes back. */
+const THEME_URL = chrome.runtime.getURL("ns-theme.css");
 
-const NS_COMPONENTS = `
-.ns-surface { background: var(--ns-glass); -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px); border: 1px solid var(--ns-hair); border-radius: 0;
-  color: var(--ns-ink); font-family: var(--ns-font-ui); }
-.ns-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.ns-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ns-amber); flex: none; }
-.ns-head h1 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: normal; text-transform: none;
-  color: var(--ns-ink); flex: 1; }
-.ns-head .close { cursor: pointer; border: 0; background: none; font-size: 14px; color: var(--ns-mute);
-  line-height: 1; padding: 2px 3px; }
-.ns-head .close:hover { color: var(--ns-ink); }
-.ns-meter { display: flex; align-items: stretch; gap: 1px; height: 6px; padding: 1px;
-  background: var(--ns-hair); border-radius: var(--ns-radius); }
-.ns-meter .ns-seg { flex: 1 1 0; min-width: 2px; background: var(--ns-tick); border-radius: 1px;
-  transition: background var(--ns-motion) ease-out; }
-.ns-meter .ns-seg.on { background: var(--ns-amber); }
-.ns-meter .ns-seg.on--time { background: var(--ns-cyan); }
-.ns-meter--sm { height: 4px; padding: 0; }
-.ns-meter--xs { height: 3px; padding: 0; }
-.ns-score { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.ns-reading { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ns-font-read);
-  font-size: 19px; font-weight: var(--ns-w-read); font-variation-settings: "wght" var(--ns-w-read);
-  font-variant-numeric: tabular-nums; color: var(--ns-ink); }
-.ns-strips { display: flex; flex-direction: column; gap: 8px; }
-.ns-strip { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0; }
-.ns-strip .k { font-size: 11.5px; color: var(--ns-mute); }
-.ns-strip .v { font-family: var(--ns-font-read); font-size: 12.5px; font-weight: var(--ns-w-read);
-  font-variation-settings: "wght" var(--ns-w-read); font-variant-numeric: tabular-nums;
-  color: var(--ns-ink); white-space: nowrap; }
-.ns-strip .v.ns-live { color: var(--ns-amber); font-variation-settings: "wght" var(--ns-w-read-strong); }
-.ns-strip .v.ns-time { color: var(--ns-cyan); }
-.ns-strip .v.ns-dead { color: var(--ns-bad); }
-.ns-chip { display: inline-block; font-family: var(--ns-font-read); font-weight: 600; font-size: 10px;
-  line-height: 1.25; padding: 1px 5px 1px 7px; border: 1px solid var(--ns-mute);
-  border-radius: 999px 2px 2px 999px; color: var(--ns-mute); }
-.ns-chip--live { border-color: var(--ns-amber); color: var(--ns-amber); }
-.ns-chip--dead { border-color: var(--ns-bad); color: var(--ns-bad); }
-.ns-btn { font-family: var(--ns-font-ui); font-size: 12px; line-height: 1; color: var(--ns-ink);
-  background: var(--ns-lift); border: 1px solid var(--ns-hair); border-radius: var(--ns-radius);
-  padding: 5px 9px; cursor: pointer; }
-.ns-btn:hover { border-color: var(--ns-amber); color: var(--ns-amber); }
-.ns-btn:disabled { opacity: 0.5; cursor: default; border-color: var(--ns-hair); color: var(--ns-mute); }
-.ns-actions { display: flex; gap: 6px; margin-top: 8px; }
-.ns-foot { margin: 8px 0 0; font-size: 11px; color: var(--ns-mute); }
-.ns-note { margin: 0; font-size: 11.5px; color: var(--ns-mute); line-height: 1.55; }
-.ns-note--bad { color: var(--ns-bad); }
-.ns-tags { margin-top: 10px; border-top: 1px solid var(--ns-hair); padding-top: 8px; }
-.ns-taghead { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
-.ns-taghead b { font-weight: 600; font-size: 11.5px; color: var(--ns-ink); }
-.ns-taghead span { font-size: 11px; color: var(--ns-mute); }
-.ns-tagwrap { display: flex; flex-wrap: wrap; gap: 4px; }
-.ns-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ns-ink);
-  background: var(--ns-lift); border: 1px solid var(--ns-hair); border-radius: var(--ns-radius);
-  padding: 2px 6px; cursor: copy; }
-.ns-tag:hover { border-color: var(--ns-amber); }
-.ns-tag .ns-tagscore { font-family: var(--ns-font-read); font-size: 10px; color: var(--ns-mute);
-  font-variant-numeric: tabular-nums; }
-.ns-tag.ns-add { border-color: var(--ns-cyan); color: var(--ns-cyan); }
-.ns-tag.ns-add .ns-tagscore { color: var(--ns-cyan); }
-.ns-coach { margin-top: 10px; border-top: 1px solid var(--ns-hair); padding-top: 8px; }
-.ns-coach-q { display: flex; gap: 6px; }
-.ns-coach textarea { flex: 1; background: var(--ns-lift); color: var(--ns-ink); border: 1px solid var(--ns-hair);
-  border-radius: var(--ns-radius); padding: 6px 8px; font-family: var(--ns-font-ui); font-size: 12px;
-  resize: vertical; min-height: 40px; }
-.ns-coach textarea::placeholder { color: var(--ns-mute); }
-.ns-coach textarea:focus { outline: none; border-color: var(--ns-amber); }
-.ns-answer { margin: 8px 0 0; white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: var(--ns-ink);
-  max-height: 260px; overflow: auto; }
-.ns-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 3px 0; }
-.ns-row .t { font-size: 11.5px; color: var(--ns-mute); }
-.ns-row .m { width: 84px; }
-.ns-row .n { font-family: var(--ns-font-read); font-size: 12px; font-variant-numeric: tabular-nums;
-  color: var(--ns-ink); width: 28px; text-align: right; }
-.ns-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
-.ns-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ns-ink);
-  border: 1px solid var(--ns-hair); border-radius: 999px; padding: 2px 8px; }
-.ns-badge .bd { width: 5px; height: 5px; border-radius: 50%; }
-.ns-badge.bt .bd { background: var(--ns-amber); }
-.ns-badge.bo .bd { background: var(--ns-cyan); }
-.ns-list { margin-top: 6px; }
-.ns-item { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; text-decoration: none; }
-.ns-item + .ns-item { border-top: 1px solid var(--ns-hair); }
-.ns-item:hover .ns-item-title { color: var(--ns-amber); }
-.ns-item-title { font-size: 11.5px; line-height: 1.4; color: var(--ns-ink); flex: 1; }
-.ns-item .ns-item-v { font-family: var(--ns-font-read); font-size: 11px; color: var(--ns-mute);
-  font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ns-section-title { font-size: 11.5px; color: var(--ns-mute); margin: 10px 0 4px; }
-.ns-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.ns-chipbtn { font-size: 11px; color: var(--ns-cyan); background: var(--ns-lift); border: 1px solid var(--ns-hair);
-  border-radius: var(--ns-radius); padding: 2px 6px; cursor: pointer; }
-.ns-chipbtn:hover { border-color: var(--ns-cyan); }
-.ns-chipbtn.ns-q { color: var(--ns-ink); }
-.ns-skeleton { display: flex; flex-direction: column; gap: 6px; }
-.ns-skeleton span { display: block; height: 10px; background: var(--ns-tick); border-radius: 1px; }
-@keyframes ns-open { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes ns-glow {
-  0% { text-shadow: none; }
-  20% { text-shadow: 0 0 0 rgba(240, 165, 0, 0); }
-  40% { text-shadow: 0 0 18px rgba(240, 165, 0, 0.45); }
-  100% { text-shadow: 0 0 0 rgba(240, 165, 0, 0); }
+let themeSheet = null;
+function loadThemeSheet() {
+  if (!themeSheet) {
+    themeSheet = fetch(THEME_URL)
+      .then((res) => (res.ok ? res.text() : Promise.reject(new Error(res.status))))
+      .then((text) => {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(text);
+        return sheet;
+      })
+      .catch((err) => {
+        // Surfacing a card with no stylesheet at all is better than a second copy
+        // of the CSS in here quietly drifting from the original again.
+        console.warn("[niche-scope] ns-theme.css unavailable:", err);
+        return null;
+      });
+  }
+  return themeSheet;
 }
-.ns-enter { animation: ns-open var(--ns-motion) ease-out; }
-.ns-glow--live { animation: ns-glow 900ms var(--ns-motion) ease-out; }
-@media (prefers-reduced-motion: reduce) {
-  .ns-enter { animation: none; }
-  .ns-glow--live { animation: none; text-shadow: none; }
-  .ns-meter .ns-seg { transition: none; }
-}`;
+
+// Started at load, not on first card: by the time anyone opens a watch page the
+// sheet has long since arrived, and there is no unstyled flash to catch.
+loadThemeSheet();
 
 function api(path, opts) {
   return new Promise((resolve) => {
@@ -306,12 +200,15 @@ function mountHost(name, right, top) {
   host.setAttribute("data-ns-theme", currentTheme());
   host.style.cssText = `position:fixed;right:${right}px;top:${top}px;z-index:999999;`;
   const shadow = host.attachShadow({ mode: "open" });
-  const style = document.createElement("style");
-  style.textContent = NS_TOKENS + NS_COMPONENTS;
   const root = document.createElement("div");
-  shadow.appendChild(style);
   shadow.appendChild(root);
   document.body.appendChild(host);
+  // The component CSS is the real stylesheet, adopted into the shadow. The
+  // custom properties are not here at all: this host carries data-ns-theme and
+  // sits in the page, so ns-theme.css styles it and its tokens inherit inward.
+  loadThemeSheet().then((sheet) => {
+    if (sheet) shadow.adoptedStyleSheets = [sheet];
+  });
   hosts[name] = { host, shadow, root };
   return hosts[name];
 }

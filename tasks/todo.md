@@ -140,3 +140,42 @@ fixture fix: `querySelector` with a comma-separated list returns the first match
 in *document* order, not the order you wrote, so the image link was beating the
 image element; and the one-button-per-card guard only existed at the call site,
 so a repeated page pass could stack icons.
+
+## Phase G: Glassmorphism pass
+
+Planned in `tasks/glass-plan.md` (new file - `tasks/plan.md` and the Phase C/D
+work above are untouched). Every visual surface in `extension/` moves to a full
+glass treatment: translucent tinted layers, blur, luminous hairline, soft shadow,
+modern radii. No tile limit was imposed, per the user's decision; the scroll cost
+is handled by making blur cheap rather than by showing glass on fewer surfaces.
+
+Design premise changes on purpose: the current system states "never shadows" and
+"no chrome" and pins a 2px radius, and full glass inverts all three. The file's
+comments get rewritten so the next change is not made against a premise that no
+longer holds. Typography is not touched.
+
+- [x] G0.1: `web_accessible_resources` for `ns-theme.css`; inject the real stylesheet into each shadow root instead of the `NS_TOKENS` + `NS_COMPONENTS` strings - done via `adoptedStyleSheets`; tokens arrive by inheritance from the `data-ns-theme` host, so no token block is needed in the shadow
+- [x] G0.2: delete both JS CSS copies and fold the card-only rules (`.ns-head`, `.ns-score`, `.ns-row`, `.ns-badge`, `.ns-item`, `.ns-coach`, `.ns-chipbtn`, `.ns-skeleton`, `.ns-tags`) into `ns-theme.css`, which is missing them today
+- [x] G0.3: `extension/tests/theme.test.mjs`, written red first - every `class="..."` token in `content.js` must resolve in `ns-theme.css` - red with 33 undefined classes, green after the fold; also asserts no script carries a `var(--ns-` reference
+- [x] G0.4: `CONSTRAINTS.md` - contrast floor, blur cardinality rule, reduced-motion and reduced-contrast handling, and the rule that it is not weakened to make a change pass. Point `AGENTS.md` at it
+- [x] G0.5: record which value is correct for the three drifts already present (`.ns-reading` 20px vs 19px, `.ns-strip .v` 13px vs 12.5px, `ns-enter` vs `ns-open`) - the card's shipped values won; see "Resolved" in `tasks/glass-plan.md`
+- [ ] G0.6: live check - reload the extension, open a watch page, and confirm the card, research panel, tags, coach and skeleton render unchanged against a pre-G0 screenshot. **Blocks G1.**
+
+- [ ] G1.1: glass token layer - per-theme tint alphas, blur radii, luminous hairline, inner highlight, separate dark/light shadow sets
+- [ ] G1.2: radius scale - 12px surfaces, 8px inner, 999px pills
+- [ ] G1.3: solve the tint alphas by measurement - the minimum that clears 4.5:1 for 11.5px ink over the worst-case backdrop, both themes, pinned in `CONSTRAINTS.md`
+- [ ] G1.4: `prefers-contrast: more`, `prefers-reduced-transparency`, `forced-colors` handling; reduced motion still passes
+- [ ] G2.1: watch card gets the full treatment - the reference surface
+- [ ] G2.2: bind blur depth and tint warmth to the card's own urgency state
+- [ ] G2.3: verify the close button, score row, meter, tags, coach textarea and skeleton survive translucency (the textarea and skeleton are what usually break)
+- [ ] G3.1: popup surface, toggle tracks, status dot; light mode must read as elevated without the shadow doing all the work
+- [ ] G4.1: research panel, its list rows, badges and chip buttons; a scrolling list inside one glass surface is a different cost shape from many surfaces
+- [ ] G5.1: `IntersectionObserver` gates the blur - roughly ten cards blurred at a time instead of a hundred, and the class flips on intersection rather than per frame
+- [ ] G5.2: `contain: paint` per tile so each blur region considers only its own card
+- [ ] G5.3: strip gets the whole glass treatment with the blur omitted - a grid strip sits over a uniform page colour, so blurring it returns that same colour
+- [ ] G5.4: hover icon keeps a real blur, because it sits on a photograph and the blur does visible work
+- [ ] G5.5: measure scroll frame time with the overlay on and off, and the live blur-region count; if outside budget, fix with a cheaper blur technique and not fewer cards
+- [ ] G6.1: contrast sweep of every surface, both themes, every urgency state, measured
+- [ ] G6.2: `forced-colors` and `prefers-contrast: more` verified per surface
+- [ ] G6.3: `extension/README.md` - the new look, what the depth-as-signal choice means, and how a person is told a preference made the surfaces solid
+- [ ] G6.4: version bump, full gates, push
