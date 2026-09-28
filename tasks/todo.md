@@ -213,3 +213,29 @@ G0 changed no value.
 - [ ] W11.2: confirm the up-next list now carries the same two-row strip as a
   grid, that the video being watched has no strip on it, and that no ad slot
   got one.
+- [ ] W11.3: the card is about to stop being a fixed overlay and become the first item of the up-next list, so W11.1's overlay check is superseded by Phase SB below. W11.2 still stands.
+
+## Phase SB: Card in the up-next sidebar
+
+Plan: `tasks/sidebar-plan.md`. The card holds the place of the first two up-next
+videos, in normal flow, with no `z-index`, and responsive. Different work from
+the glass restyle; the two meet at G2, which gives this box its glass surface.
+(Named SB, not S: the older "Phase S" above is Style V2 and keeps that name.)
+
+- [ ] S0.1: one-shot probe - which sidebar selector matched, the first compact renderer's parent and its computed display/overflow, one tile's measured height, whether an inserted `div` is visible, and the width at which YouTube drops the sidebar. One console line, read before anything is built.
+- [ ] S0.2: fold the answers into `extension/tests/fixtures/watch.html` so the fixture stops being a guess, and record the measured tile height and the sidebar breakpoint in the plan's Resolved section
+- [ ] S1.1: `extension/lib/placement.js` - `sidebarSlot(doc)` and `placementFor({doc, pathname, width})`, tested against the fixture at each breakpoint
+- [ ] S1.2: `mountHost` gains an in-flow mode; the card loses `position:fixed`, `right`, `top` and `z-index` and stops being appended to `body`. The search and channel panels keep the fixed mode.
+- [ ] S2.1: the card's height cap is `calc(var(--ns-tile-h) * 2)` - two measured tile heights, not a guessed pixel count
+- [ ] S2.2: readings become a two-column grid at sidebar width, one column below the mobile breakpoint. This is what makes S2.1 reachable.
+- [ ] S2.3: tags and the coach replace the readings in place instead of appending below, so nothing pushes the list past its cap
+- [ ] S3.1: re-insert when YouTube re-renders the sidebar; the mount is idempotent, never two cards
+- [ ] S3.2: a dismissed card stays dismissed for that page and returns on the next video
+- [ ] S4.1: desktop - card is the first sidebar item, the first two videos sit below it
+- [ ] S4.2: below YouTube's own sidebar breakpoint the sidebar is a drawer; insert anyway so the card is there when the drawer opens
+- [ ] S4.3: mobile - **decided: no card on a phone.** `placementFor` returns `none` below the sidebar breakpoint, no insertion is attempted, and a test asserts the up-next list is left exactly as YouTube shipped it. Squeezing a reading table into a phone is a worse surface than none.
+- [ ] S4.4: width pass at 320 / 768 / 1024 / 1440, in both themes
+- [ ] S5.1: remove the probe and the dead fixed-card offsets; keep a card-specific `.ns-host` rule carrying both a width and a height cap
+- [ ] S5.2: `extension/README.md` - where the card lives, why it is in flow, and what "two videos" is measured against
+- [ ] S5.3: version bump, full gates per `CONSTRAINTS.md`, push
+- [ ] S5.4: hand off to G2, which gives the new box its glass surface
