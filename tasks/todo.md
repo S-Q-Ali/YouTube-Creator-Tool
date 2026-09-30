@@ -215,25 +215,61 @@ G0 changed no value.
 
 ## Phase SB: Card in the up-next sidebar
 
-Plan: `tasks/sidebar-plan.md`. The card holds the place of the first two up-next
-videos, in normal flow, with no `z-index`, and responsive. Different work from
-the glass restyle; the two meet at G2, which gives this box its glass surface.
-(Named SB, not S: the older "Phase S" above is Style V2 and keeps that name.)
+Plan: `tasks/sidebar-plan.md`. The card holds the place of the first two
+videos, in normal flow, with no `z-index`, and responsive. One rule for both
+lists YouTube shows in a watch sidebar: the card is inserted immediately before
+the list it displaces, takes its own space, and the list moves down. Different
+work from the glass restyle; the two meet at G2, which gives this box its glass
+surface. (Named SB, not S: the older "Phase S" above is Style V2 and keeps that
+name.)
 
-- [x] S0.1: one-shot probe - which sidebar selector matched, the first tile's parent and its computed display/overflow, one tile's measured height, whether an inserted `div` is visible, and the width at which YouTube drops the sidebar. One console line, read before anything is built. Ran three times; the first two reported the page as broken when the probe was the thing at fault.
+- [x] S0.1: one-shot probe - which sidebar selector matched, the first tile's parent and its computed display/overflow, one tile's measured height, whether an inserted `div` is visible, and the width at which YouTube drops the sidebar. One console line, read before anything is built. Ran three times; the first two reported the page as broken when the probe was the thing at fault. Now deleted (S5.1).
 - [x] S0.2: fold the answers into `extension/tests/fixtures/watch.html` so the fixture stops being a guess, and record the measurements in the plan's Resolved section. Found the real chain, the 114px tile, the 8px gap, the list's own `div#header` - and a live double-visit bug in `each()` that the wrong fixture had been hiding.
-- [ ] S1.1: `extension/lib/placement.js` - `sidebarSlot(doc)` and `placementFor({doc, pathname, width})`, tested against the fixture at each breakpoint. The slot is the first **tile**, not the container's first child: the list has a `div#header` with the "Up next" heading, and prepending puts the card above it.
-- [ ] S1.2: `mountHost` gains an in-flow mode; the card loses `position:fixed`, `right`, `top` and `z-index` and stops being appended to `body`. The search and channel panels keep the fixed mode. The host now lives inside YouTube's container and must carry its own width - `#secondary-inner` is 320px.
-- [ ] S2.1: the card's height cap is `calc(var(--ns-tile-pitch) * 2)` - two measured **pitches** (top of one tile to top of the next), not heights. A video occupies 122px: 114 of card plus 8 of gap, so two heights would have pushed 1.97 videos and looked right. Re-measured on layout change, not baked in.
-- [ ] S2.2: readings become a two-column grid at sidebar width, one column below the mobile breakpoint. This is what makes S2.1 reachable.
+- [x] S1.1: `extension/lib/placement.js` - `placementFor({doc, pathname, width})` and `mountAt(placement, host)`, tested against real fixtures. The slot is the first **tile**, not the container's first child: the list has a `div#header` with the "Up next" heading, and prepending puts the card above it. The same rule gained a second case when a playlist is open - see S1.4.
+- [x] S1.2: the card leaves `position:fixed`, `right`, `top` and `z-index` and stops being appended to `body`, via `mountInlineCard()` alongside the old `mountHost()`. The search and channel panels keep the fixed mode. The host lives inside YouTube's container now and takes `width:100%` from it rather than a 300px cap of its own.
+- [x] S2.1: the card's reserved height is `calc(var(--ns-tile-pitch) * 2)` - two measured **pitches** (top of one tile to top of the next), not heights. A video occupies 122px: 114 of card plus 8 of gap, so two heights would have pushed 1.97 videos and looked right. `measureTilePitch()` reads it off the live list at mount time and hands it in as a custom property; 122 is only the placeholder for a list that has not been laid out yet. **A floor, not a cap** - see S4.5.
+- [x] S2.2: readings become a two-column grid at sidebar width. **No longer a cap-enabler** - that was its reason and the cap is gone - but kept on its own merits: a three-column stat row beside it is what the reference does, and eight readings in one column is the tallest thing on the card. Shipped as two halves. The three headline numbers now lead the card in one row of equal columns, label above value - **engagement, outlier, vph** - which is the arrangement the card was missing and the reason it read as a scroll of eight equal strips rather than a panel. Engagement had no home at all: likes and comments were both on the card as raw counts, and a count of 2.4k likes means nothing without the views it sits against. The remaining six readings demote to `repeat(auto-fit, minmax(140px, 1fr))` - two columns at sidebar width, one column in a collapsed sidebar, rather than six values squeezed into a phone's width. Equal columns and tabular figures are load-bearing, not cosmetic: three numbers animating side by side with proportional digits visibly writh, and content-sized columns make the row lean and read as a table instead of as three peers.
 - [ ] S2.3: tags and the coach replace the readings in place instead of appending below, so nothing pushes the list past its cap
-- [ ] S3.1: re-insert when YouTube re-renders the sidebar; the mount is idempotent, never two cards
-- [ ] S3.2: a dismissed card stays dismissed for that page and returns on the next video
-- [ ] S4.1: desktop - card is the first sidebar item, the first two videos sit below it
+- [x] S3.1: re-insert when YouTube re-renders the sidebar; the mount is idempotent, never two cards. `onDomChange()` re-mounts before scanning, and `mountAt()` is a no-op when the card is already ahead of the right anchor.
+- [x] S3.2: **the card folds, it is never destroyed.** Revised from "a dismissed card stays dismissed for that page": measuring the reference showed it has no close button at all - it folds with a chevron, and a fold cannot lose the card. The original design *was* the bug - destroying the host made `onDomChange` race the close, so the card came back on the next mutation or did not, and neither was reliable. One chevron now toggles `data-ns-open` on the host; collapsed keeps the header and drops the body, with `aria-expanded` and an accessible name the old `×` never had. To stop showing the card at all, the existing `showCard` popup preference is the switch. Doing it split one attribute that had been doing two jobs: `data-ns-expanded` was written by `setExpanded()` from `chartOpen`, so **opening the chart silently unfolded the whole card** and closing it silently refolded it. `data-ns-open` now belongs to the fold alone and is separate from `cardState.open`; the chart has no say in the card's height at all. The fold control is an icon, and an icon button with no text has no accessible name, so it carries a `.sr-only` label that changes with the state ("Fold…" / "Unfold…") - a chevron that turns round still announces the same words otherwise. Every control on the card now has a focus ring: the chart tabs had one and the header toggle and action buttons did not, so a keyboard reader could land on them and see nothing.
+- [x] S4.1: desktop - card is the first item of the list, the first two videos sit below it
 - [ ] S4.2: below YouTube's own sidebar breakpoint the sidebar is a drawer; insert anyway so the card is there when the drawer opens
-- [ ] S4.3: mobile - **decided: no card on a phone.** `placementFor` returns `none` below the sidebar breakpoint, no insertion is attempted, and a test asserts the up-next list is left exactly as YouTube shipped it. Squeezing a reading table into a phone is a worse surface than none.
+- [x] S4.3: mobile - **decided: no card on a phone.** `placementFor` returns `none` below the sidebar breakpoint, no insertion is attempted, and a test asserts the up-next list is left exactly as YouTube shipped it. Squeezing a reading table into a phone is a worse surface than none. An **unreadable** width is also treated as narrow: guessing "desktop" would push a list that may not be there.
 - [ ] S4.4: width pass at 320 / 768 / 1024 / 1440, in both themes
-- [ ] S5.1: remove the probe and the dead fixed-card offsets; keep a card-specific `.ns-host` rule carrying both a width and a height cap
+- [x] S4.5: **the card is taller than two videos.** Resolved by decision rather than by code: the two-pitch height is a floor, not a cap, so the card is as tall as its content and the list is pushed down by exactly that. In flow, so nothing overlaps and nothing is covered. The reference does the same - its panel runs 800-1200px - and that is the behaviour that was chosen.
+- [x] S1.4: **a playlist watch is the same rule on a different surface.** Opening a playlist replaces "Up next" outright with `ytd-playlist-panel-renderer#playlist`, so there are no up-next tiles to displace. The card goes **above the panel element**, not above the panel's `#items` and not inside the panel: it is a sibling ahead of the whole panel, so the header, the playlist name, the controls and every video all move down under it together. The first attempt anchored to `#items` and put the card between the playlist's name and its videos - a third arrangement nobody asked for. The panel wins over the up-next case when both are present. Fixture: `extension/tests/fixtures/playlist-watch.html`, with a test asserting the panel is the card's next sibling and that the panel's own children are untouched. Playlist rows still get no readings - that is separate work, not a gap in this one.
+- [x] S2.4: **the growth chart, and an honest empty state.** `/api/videos/history` reads the
+      `video_snapshots` the poller already writes, so it costs no quota. **The chart is part of the card now, not
+      behind a button** - it used to sit behind a "Growth" button, which made the most informative thing on a
+      scorecard something you had to ask for, and hid the first week behind a control with an obvious name. Most
+      videos a reader lands on are not on their watch list and so have no rows at all: the card says that and says
+      what to do about it, rather than drawing a flat line that reads like "this video stopped growing". **This is
+      a real ceiling, not a missing feature** - YouTube publishes a video's current views and not its history, so a
+      series can only exist for videos this app has been watching.
+- [x] S2.5: **the chart looks like a chart, and its ranges mean something.** Three changes, all from measuring
+      the reference. The block leads with the number - 26px, tabular, with a 10px label under it - instead of two
+      equal-weight lines reading like a file listing, the area under the line is filled with a gradient rather than
+      left as a bare stroke, and the range tabs sit *above* the number rather than below the chart, because the
+      tabs answer "which window am I looking at" and putting the value underneath made the reader read the number
+      before finding out which number it was. **The ranges are measured from publication, not from today** - "the
+      last 7 days" of a week-old video is its whole life, and of an eight-month-old video is the only part anyone
+      can still see, so neither says how the video did. `extension/lib/chartRange.js` cuts the ranges from one
+      fetch of the full window, so switching tabs is local and the tabs cannot race. That makes honesty load
+      bearing: the app keeps 90 days, so "1st 7 days" of a video from last year is a question it cannot answer, and
+      the chart says which piece is missing rather than drawing the part it has under a tab that claims the whole.
+- [x] S2.6: **no range thinner than a line needs.** The reference offers a 24-hour tab because it reads views
+      hourly. This app records one reading per day, so a 24h window holds exactly one point and can only ever say
+      "not enough readings" - while sitting first in the row, where a reader lands by default. The tab looked
+      reasonable and could not draw a chart in any circumstance, so it is gone, and the rule is now structural: a
+      test asserts no range is short enough to hold fewer than the three points a line needs, so the next person to
+      add one is asked whether the readings support it.
+- [x] S2.7: a flat series draws across the middle of the chart and drops the fill, instead of pinning to the floor
+      under 8px of shading. A video that got no views all week is ordinary, and the old rendering read as a
+      collapse rather than as a week with no movement. `geometry()` in `lib/chartRange.js`, with the path
+      arithmetic pulled out of a template string so its one edge case is testable. The fill is dropped too: a block
+      of colour under a level line says "these views happened", and none did.
+- [ ] S2.8: the card shows the **watched** video's numbers on a playlist, not the playlist's. Two different subjects; worth a test so a playlist context never swaps the card's subject.
+- [x] S5.1: the S0 probe is deleted and out of `manifest.json`. It was 394 lines that polled every YouTube page for up to 20s and inserted 40px red divs into the list to measure it - fine as a one-shot diagnostic, actively harmful as a shipped content script, because it would have been mutating the very list this phase is about. `extension/lib/probe.js` removed; manifest content script is now `nsMeta, tiles, lineModel, chartRange, placement, thumb, content`. Its breakpoint question is still open (S4.4) and is answered by re-adding it temporarily during manual verification, which is what "temporary" has to mean.
 - [ ] S5.2: `extension/README.md` - where the card lives, why it is in flow, and what "two videos" is measured against
 - [ ] S5.3: version bump, full gates per `CONSTRAINTS.md`, push
 - [ ] S5.4: hand off to G2, which gives the new box its glass surface

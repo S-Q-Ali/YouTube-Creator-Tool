@@ -11,10 +11,26 @@ it.
 
 | Check | Command | Bar |
 | --- | --- | --- |
-| Tests | `npx vitest run` | 157 tests, 0 failing |
+| Tests | `npx vitest run` | **157 minimum**, 0 failing (currently 236) |
 | Types | `npm run typecheck` | 0 errors |
 | Lint (extension) | `npx eslint extension` | 0 problems |
 | Lint (repo) | `npx eslint .` | baseline, do not regress |
+
+Source files are edited with a tool that writes UTF-8. PowerShell 5.1's
+`Set-Content` and `Out-File` default to Windows-1252, which is invisible on a
+file of pure ASCII and silently collapses every em dash in it from three bytes to
+one - and then Chrome refuses the whole extension with "Could not load manifest",
+which looks like a broken build and is not one. Enforced by
+`extension/tests/encoding.test.mjs`, which checks the bytes rather than the text
+(a Windows-1252 file of pure ASCII decodes as valid UTF-8 and would pass a
+naive read) and names every offending file in one run.
+
+The test count is a floor, not a snapshot. It was a hard number once, and it
+went stale immediately - the suite grew to 212 while the file still said 157,
+so the row had stopped describing anything and would have kept passing if half
+the suite were deleted. A floor fails in the one direction that matters: a diff
+that removes tests is a regression, and adding tests is the expected way to move
+it.
 
 The repo-wide lint run has 5 errors and 62 warnings that predate the glass work
 and live in components this extension never touches. They are a known baseline,
@@ -31,6 +47,22 @@ at zero.
 - Both themes are checked: light overrides colours only, and inherits fonts,
   weights, radius and motion from the dark block. A token that exists in one and
   not the other is a bug (`extension/tests/theme.test.mjs`).
+- Enforced by `npm run check:contrast`, which reads the hexes out of
+  `ns-theme.css` and measures each colour the card paints as text against
+  `--ns-glass-solid`. It is a test rather than a script because a test cannot be
+  forgotten in a run and cannot report a passing grade for a colour that stopped
+  being used. Written after this floor had already failed three times unnoticed:
+  the stat row's amber and cyan at 4.23:1 and 4.19:1 in light, and its error red
+  at 4.13:1 in dark. The hexes are read from the stylesheet, never copied into
+  the test - a copied copy rots the moment someone nudges a value.
+- The tightest pairing on the card is `--ns-mute` on `--ns-glass-solid`: 4.89:1
+  dark, 5.01:1 light. It is the label colour for every secondary reading, so a
+  small drift in it degrades a dozen labels at once and no other pair fails.
+- A token is measured against the surface it is painted on. An accent tuned
+  against the card is not thereby safe on a raised cell inside the card: in
+  light theme no grey between `#ececec` and `#f8f8f8` clears 4.5:1 for both
+  `--ns-amber` and `--ns-cyan`, which is why the stat row is grouped with a
+  border rather than a fill.
 
 ## One stylesheet, no copies
 

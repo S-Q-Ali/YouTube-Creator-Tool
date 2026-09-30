@@ -125,31 +125,42 @@ measurement is taken once in the browser and written to a custom property.
 
 ### Phase SB2: Push exactly two videos down
 
-- [ ] **S2.1** The card's height cap is **two measured tile pitches**, published
-  as `--ns-tile-pitch` and consumed as `calc(var(--ns-tile-pitch) * 2)`.
-  *Corrected after S0.* The plan originally said two tile *heights*, and the
-  measurement says that is wrong: a 40px probe displaced the list by 48px, so
-  each video occupies 122px - 114px of card plus 8px of gap. Two heights would
-  have pushed 1.97 videos and looked correct while being off. Pitch is measured
-  as the distance from one tile's top to the next one's, which includes the gap
-  by construction, and is re-measured on layout change rather than baked in as
-  the 122 it happens to be today. *That last part is the real fix:* a constant
-  would be right until YouTube changed a margin, and then the card would be
-  quietly wrong in a way no assertion catches.
-  *Test:* the cap in `content.css` is expressed in pitches, never a literal
+- [ ] **S2.1** The card's height is a **floor of two measured tile pitches**,
+  published as `--ns-tile-pitch` and consumed as `calc(var(--ns-tile-pitch) *
+  2)`. **Revised after the ViDiQ comparison: it is a floor, not a cap.** The
+  earlier reading was that the card holds the space of two videos and no more.
+  Measuring ViDiQ's own markup contradicted that: its chart alone is
+  `min-height: 170px`, and with the stat row, range strip, thumbnail block and
+  change timeline the panel runs to 800-1200px. It takes the whole sidebar and
+  the user chose that over the two-video rule. So the card now grows to its
+  content and pushes the list down by whatever it is actually using, and the
+  pitch is kept as the one number that is still true at any width - the card is
+  never smaller than the space of two videos, whatever the reader's font size
+  or sidebar width has done to the rows.
+  *Still measured, never baked in.* The pitch is the distance from one tile's
+  top to the next one's, which folds YouTube's own gap in by construction. A
+  constant would be right until YouTube changed a margin, and then the card
+  would be quietly wrong in a way no assertion catches.
+  *Test:* the floor in `ns-theme.css` is expressed in pitches, never a literal
   pixel count; a fixture with a different tile height and a different gap
-  produces a different cap, which is the assertion that would have caught the
+  produces a different floor, which is the assertion that would have caught the
   original mistake.
-  *Dependencies:* S1.2. *Scope:* Small.
 - [ ] **S2.2** Readings become a two-column grid at sidebar width, one column
-  below the mobile breakpoint. This is what makes S2.1 reachable.
+  below the mobile breakpoint. **No longer a cap-enabler** - that was its stated
+  reason, and the cap is gone - but kept on its own merits: a three-column
+  stat row beside it is what the reference does, and eight readings in one
+  column is the tallest thing on the card.
   *Test:* `theme.test.mjs` fails if `.ns-strips` has no column rule; a
   breakpoint assertion covers 1440px and 320px.
   *Dependencies:* S1.2. *Scope:* Small.
 - [ ] **S2.3** Tags and the coach replace the readings in place instead of
-  appending below, so nothing can push the list past its cap.
+  appending below. **The reason changed, the task did not.** It was written so
+  nothing could push the list past the cap; with no cap, the reason is that
+  stacking a tags panel *under* eight readings makes the card twice as tall for
+  no added information, and the reader loses the stats they was reading. Replacing
+  them is what the reference does too.
   *Test:* after opening tags, the readings are gone, the extras region holds
-  the panel, and the card's declared height is unchanged.
+  the panel, and the card is no taller than it was with the readings.
   *Dependencies:* S2.2. *Scope:* Medium.
 
 ### Checkpoint: SB2
@@ -164,10 +175,23 @@ measurement is taken once in the browser and written to a custom property.
   *Test:* remove the card node, fire the observer, assert exactly one card
   returns.
   *Dependencies:* S1.2. *Scope:* Small.
-- [ ] **S3.2** A dismissed card stays dismissed for the rest of that page, and
-  returns when another video is opened.
-  *Test:* dismiss, run a re-insert pass, assert still gone; change the route,
-  assert it is back.
+- [ ] **S3.2** The card folds and unfolds; it is never destroyed.
+  **Revised after the ViDiQ comparison.** This was written as a dismissal: "a
+  dismissed card stays dismissed for the rest of that page, and returns when
+  another video is opened." Measuring the reference showed it has **no close
+  button at all** - it folds with a chevron, and folding cannot lose the card.
+  The original design was the bug, not just an absence: destroying the host made
+  `onDomChange` race the close, so the card came back on the next DOM mutation
+  or did not, and neither was reliable.
+  *What it does now:* one chevron in the header toggles `data-ns-open` on the
+  host. Collapsed keeps the header and drops the body; the card stays mounted,
+  so nothing to re-insert and nothing to race. It carries `aria-expanded` and
+  an accessible name, which the old `×` did not.
+  *Test:* fold, assert the card is still in the list and the host still exists;
+  assert `aria-expanded="false"`; unfold and assert the body is back. Folding is
+  not dismissal - to stop showing the card at all, the existing `showCard`
+  preference in the popup is the switch, and the re-insert pass must still
+  respect it.
   *Dependencies:* S3.1. *Scope:* Small.
 
 ### Checkpoint: SB3
@@ -293,6 +317,105 @@ preload warnings and the `powerPreference` notice are all YouTube's too.
 | The card ends up taller than two videos and pushes four | The design promise is quietly broken | The cap is derived from the measured tile height, not chosen by eye; S2.1's test fails on a literal |
 | Nothing to displace on mobile | Feature simply absent on phones, or a return to an overlay | S4.3 is a decision recorded before implementation, and `none` is a legitimate answer |
 | Search and channel panels regress | Other surfaces break while the card improves | Their fixed mode is untouched; S1.2's test asserts they keep `position: fixed` |
+| A playlist watch is a different list, not a variation of the same one | The card is inserted into a list that is not there, or dropped above the playlist header | S1.4 is a separate case with its own real fixture, and a test that both cases present at once resolves to the playlist |
+| The chart has no data for most videos | A flat line that reads like "this video stopped growing" when it means "nobody has been counting" | `/api/videos/history` reports `spanDays` and `partial`; the card's empty state says why and what to do, rather than drawing |
+| The card is taller than two videos once the chart is open | The "two videos" promise is quietly broken | S4.5 records that the figure describes the closed card. In flow, so a taller card pushes the list further and overlaps nothing - but the docs say so |
+
+## What the second list turned out to be
+
+A watch page does not have one sidebar list. It has two, and which one is
+present is not a question of width.
+
+Opening a playlist replaces the recommendation list outright:
+`ytd-playlist-panel-renderer#playlist` takes the place of
+`ytd-watch-next-secondary-results-renderer`, and there is no "Up next" heading
+and no `yt-lockup-view-model` anywhere in the panel. So the placement rule that
+was written for one list needed a second case rather than a variation.
+
+The rule is one sentence, and it is the same for both:
+
+> The card goes at the **top** of whatever YouTube is showing, and that surface
+> is pushed down as one block.
+
+```
+  our card / container
+  |
+  YouTube's sidebar content
+```
+
+On a normal watch the surface is the up-next list, and the card goes ahead of
+its first tile so the "Up next" heading stays above the card and belongs to it.
+On a playlist the surface is the whole panel, so the card goes ahead of the
+**panel element**, not ahead of the panel's `#items`. That is the correction
+this section exists to record: anchoring to `#items` put the card between the
+playlist's name and its videos, which is a third thing nobody asked for - not
+on top, not in the list, just wedged in the middle of YouTube's own panel.
+
+The playlist case wins when both are somehow present, because the panel is what
+the reader is actually looking at.
+
+Two things this deliberately does *not* do:
+
+- **Playlist rows get no readings.** They are
+  `ytd-playlist-panel-video-renderer`, not lockups, and the panel's rows do not
+  carry the views and age the strip is built from. Adding them is its own piece
+  of work with its own measurement questions, not a gap to paper over here.
+- **The card is not inserted into the panel.** It is a sibling above it. That
+  is what keeps the panel's internal order untouched - the only thing ever added
+  is a node above it, never a node inside it - and it is why the panel moves
+  down whole rather than reflowing around a card that is part of it.
+
+## Where the card's data comes from, and where it does not
+
+The card shows the current video's numbers, not the playlist's. On a playlist
+the card is still the scorecard for the video being watched, and the list it
+pushes down happens to be a playlist. Those are two different subjects and they
+are not mixed.
+
+Of the readings a competitor tool puts on a panel like this, we can source:
+
+| Reading | Where it comes from | Always available |
+|---|---|---|
+| Views per hour | `computeVelocity` / `computeVph` | yes |
+| Outlier vs the channel | `outlierPercent` over `channelAverageViews` | yes |
+| Subscribers | `fetchChannels` | yes |
+| Growth chart | `video_snapshots`, read by `/api/videos/history` | **no** - see below |
+
+The chart is the one that cannot be had on demand. YouTube publishes a video's
+current view count and not its past, so history only exists for videos this app
+has been watching: the poller writes a row per tracked video. A video nobody
+tracked has no rows, and no amount of asking will produce them.
+
+So the card reports `spanDays` and `partial`, and when there is nothing to
+draw it says why and what to do - track the video and the line fills in over
+the following days. Drawing a flat line instead would be worse than an empty
+chart, because a flat line reads as "this video stopped growing", which is a
+claim, and it would be false: it would mean nobody has been counting.
+
+## The card is a block, so the list follows it
+
+The old card was a fixed panel with a `z-index` over the page. Making it take
+space instead of cover it means the list moves down because the card is *in*
+it, which has consequences worth writing down before the next change to it:
+
+- It cannot be `fixed`, `absolute` or `sticky`. A sticky card would keep its
+  space in the flow and then float away from the rows it is displacing, which
+  is the old behaviour with an extra step.
+- Its height has to be driven by the rows it displaces, which is why the pitch
+  is measured at mount time and handed in as `--ns-tile-pitch` rather than
+  written into the stylesheet. A hardcoded 122px is the value for one viewport
+  at one font size.
+- Anything the card shows has to fit, or the list pays for it. That is the
+  pressure behind the two-column grid in S2.2 and behind opening the chart
+  being a deliberate act rather than the default.
+- YouTube re-rendering the list takes the card with it, so the re-insert is not
+  an optimisation - it is the only thing keeping the card on the page.
+
+The card's own stylesheet cannot reach into the shadow root, so the reserved
+height is declared in `ns-theme.css` behind `:host()`. That is why the theme
+tests check for `:host(.ns-host--inline)` specifically: a rule in
+`content.css` for `.ns-host--inline .ns-card` would look correct and match
+nothing.
 
 ## Open Questions
 
