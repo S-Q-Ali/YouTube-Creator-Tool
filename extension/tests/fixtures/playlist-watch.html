@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Watch a video on YouTube</title>
+  </head>
+  <body>
+    <!--
+      A watch page with the open playlist. Opening a playlist swaps the "Up
+      next" list out for the panel, so the card's slot is above the panel
+      itself, not inside it. Taken from the live structure:
+
+        #secondary-inner
+          └─ ytd-playlist-panel-renderer#playlist
+              ├─ #header-contents  (playlist title, channel, loop/shuffle)
+              └─ #items.playlist-items
+                  └─ ytd-playlist-panel-video-renderer (per video)
+
+      The card becomes a sibling of the panel, ahead of it, so the whole panel
+      - header, name, controls and every video - is pushed down under it as one
+      block. The recommendation list is deliberately absent: with a playlist open
+      there are no up-next tiles for the card to displace.
+    -->
+    <div id="secondary">
+      <div id="secondary-inner">
+        <ytd-playlist-panel-renderer id="playlist" collapsible>
+          <div id="header-contents">
+            <h1>My saved list</h1>
+            <a href="/@example">Example Channel</a>
+          </div>
+          <div id="items" class="playlist-items">
+            <ytd-playlist-panel-video-renderer>
+              <a id="playlist-video-link-0" href="/watch?v=Playlist00001">
+                <img src="thumb-0.jpg" alt="" />
+                <span class="yt-lockup-metadata-view-model__title">First in playlist</span>
+                <span class="metadata">10K views</span>
+              </a>
+            </ytd-playlist-panel-video-renderer>
+            <ytd-playlist-panel-video-renderer>
+              <a id="playlist-video-link-1" href="/watch?v=Playlist00002">
+                <img src="thumb-1.jpg" alt="" />
+                <span class="yt-lockup-metadata-view-model__title">Second in playlist</span>
+                <span class="metadata">9K views</span>
+              </a>
+            </ytd-playlist-panel-video-renderer>
+            <ytd-playlist-panel-video-renderer>
+              <a id="playlist-video-link-2" href="/watch?v=Playlist00003">
+                <img src="thumb-2.jpg" alt="" />
+                <span class="yt-lockup-metadata-view-model__title">Third in playlist</span>
+                <span class="metadata">8K views</span>
+              </a>
+            </ytd-playlist-panel-video-renderer>
+            <ytd-playlist-panel-video-renderer>
+              <a id="playlist-video-link-3" href="/watch?v=Playlist00004">
+                <img src="thumb-3.jpg" alt="" />
+                <span class="yt-lockup-metadata-view-model__title">Fourth in playlist</span>
+                <span class="metadata">7K views</span>
+              </a>
+            </ytd-playlist-panel-video-renderer>
+          </div>
+        </ytd-playlist-panel-renderer>
+      </div>
+    </div>
+  </body>
+</html>
