@@ -19,6 +19,36 @@
   overscroll-behavior: contain;
 }
 
+/* The in-flow watch card, as opposed to the panels above.
+   This one is not a panel over the page: it is inserted into the list it
+   describes, ahead of the rows it displaces, so it has to take its width from
+   that list and let its own height be driven by the rows' spacing. Both
+   measurements are handed in as custom properties at mount time - the list's
+   width, and the measured pitch of two rows - so the card matches whatever the
+   sidebar is doing right now instead of a width and a height chosen when this
+   was written. The custom properties inherit inward from here into the shadow
+   root, which is where the surface itself is styled.
+
+   Nothing here is fixed, absolute or sticky. The point of the whole change is
+   that the card scrolls with the list and the list moves down because the card
+   is in it. The card's reserved height is not set here but in ns-theme.css,
+   because the card is inside the shadow root and a page stylesheet cannot
+   reach into it. */
+.ns-host--inline {
+  position: static;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  /* No margin of its own. The reserve is built from the measured pitch, and the
+     pitch is the distance between two rows - YouTube's own gap included - so
+     adding a gap here on top of it would reserve two videos plus a third gap,
+     which is a third of a video more than the card claims to stand in for. */
+  margin: 0;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
 /* The strip sits outside YouTube's clickable card content, but it lives in the
    same shadow tree, so it still must never eat a click meant for the video.
    The readings are the exception: each number carries a title explaining what

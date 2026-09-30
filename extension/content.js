@@ -1,4 +1,4 @@
-﻿/* Niche-Scope content script: SEO scores + research overlays on YouTube.
+/* Niche-Scope content script: SEO scores + research overlays on YouTube.
  * Fetches happen in the background worker (avoids page CORS).
  * Surfaces: the strip under every grid card, watch-page card (score + tags +
  * AI coach), search-page keyword panel, channel research card. */
@@ -220,6 +220,142 @@ function mountHost(name, right, top) {
   return hosts[name];
 }
 
+/*
+ * The watch card is not a panel over the page, so it is not mounted like one.
+ *
+ * The floating panels above are fixed with their own right/top and sized by
+ * content.css. This one goes into the list it describes, ahead of the rows it
+ * displaces, so that the list is pushed down rather than covered. Three things
+ * follow from that and all three are set here rather than left to CSS:
+ *
+ *   position is stated as static, because the rule that gave the old card its
+ *     fixed position was the thing being removed, and a host that kept it
+ *     would float over the first video while the space it reserved went
+ *     somewhere else
+ *   no z-index, because there is nothing to stack above - YouTube's own rows
+ *     are ordinary siblings and the card is ahead of them
+ *   the two measurements the CSS needs, the list's width and the pitch of two
+ *     rows, are read here and handed in as custom properties, so the card
+ *     matches the sidebar that is on screen rather than one measured once
+ */
+function mountInlineCard() {
+  // currentLocation reports the route but not the path, and placementFor wants
+  // the path, so read it here rather than have the placement guess.
+  const placement = NS_PLACEMENT.placementFor({
+    doc: document,
+    pathname: location.pathname,
+    width: window.innerWidth
+  });
+
+  if (placement.type === "none") {
+    // A card from a previous video, on a page that has no slot for one any
+    // more: take it out of the list rather than leave it stranded.
+    const stale = hosts.card;
+    if (stale) {
+      NS_PLACEMENT.unmountStale(placement, stale.host);
+      delete hosts.card;
+    }
+    return null;
+  }
+
+  let entry = hosts.card;
+  if (!entry) {
+    const host = document.createElement("div");
+    host.className = "ns-host ns-host--inline";
+    host.setAttribute("data-ns-host", "card");
+    host.setAttribute("data-ns-theme", currentTheme());
+    host.style.cssText = "position:static;display:block;";
+    const shadow = host.attachShadow({ mode: "open" });
+    const root = document.createElement("div");
+    shadow.appendChild(root);
+    loadThemeSheet().then((sheet) => {
+      if (sheet) shadow.adoptedStyleSheets = [sheet];
+    });
+    entry = { host, shadow, root, placementType: null, bound: false };
+    hosts.card = entry;
+  }
+
+  // The reserve is built from the pitch of two rows measured on this list, so
+  // the card's height follows the sidebar that is on screen: a narrower
+  // sidebar wraps titles and grows taller, and a larger font does too.
+  entry.host.style.setProperty("--ns-tile-pitch", `${NS_PLACEMENT.measureTilePitch(placement)}px`);
+
+  // Idempotent: a no-op when the card is already exactly where it belongs, so
+  // the re-render path cannot stack a second copy.
+  const moved = NS_PLACEMENT.mountAt(placement, entry.host);
+
+  // The two cases put the card in different parents - inside #contents for the
+  // up-next list, above the panel for a playlist - so a card that has crossed
+  // over needs its shell rebuilt and the close button rebound. A card that was
+  // merely re-inserted into the same place does not.
+  if (moved && entry.placementType !== null && entry.placementType !== placement.type) {
+    entry.root.innerHTML = "";
+    entry.bound = false;
+  }
+  entry.placementType = placement.type;
+  if (!entry.bound) {
+    bindCardShell(entry);
+    // The attribute is the fold contract the stylesheet reads, so it has to be
+    // on the host before anything can be measured against it. Setting it here
+    // rather than in bindCardShell keeps the state in one place - the same
+    // setCardOpen that folds the card also says what unfolded looks like.
+    setCardOpen(cardState.open);
+  }
+  return entry;
+}
+
+/**
+ * The card's own frame: the title, the fold control, and the body the readings
+ * are rendered into. Split out of the mount because crossing between the two
+ * placements throws the frame away and has to build it again.
+ *
+ * The control folds, it does not close. A close button destroyed the host, and
+ * `onDomChange` re-mounts the card 800ms after any DOM mutation on a watch page
+ * - so closing was a race, and the card came back on the next mutation or did
+ * not, and neither was something a reader could rely on. Folding leaves the
+ * card mounted, so there is nothing to re-insert. The card has no close button
+ * at all, which is also what the reference does. To stop seeing it entirely,
+ * the `showCard` preference in the popup is the switch.
+ */
+function bindCardShell(entry) {
+  if (entry.bound) return;
+  entry.root.innerHTML =
+    '<div class="ns-card ns-surface ns-enter">' +
+    '<div class="ns-head"><span class="dot"></span><h1>Niche-Scope</h1>' +
+    '<button class="ns-toggle" type="button" aria-expanded="true" aria-controls="ns-card-body">' +
+    '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">' +
+    '<path d="M10 6.5 4.5 12 3.8 11.3 8.8 6.3a.85.85 0 0 1 1.2 0l5 5-.7.7z"/>' +
+    '</svg><span class="sr-only">Fold the Niche-Scope card</span>' +
+    '</button></div>' +
+    '<div class="ns-body" id="ns-card-body"><p class="ns-note">Loading…</p></div></div>';
+
+  const toggle = entry.shadow.querySelector(".ns-toggle");
+  toggle.addEventListener("click", () => setCardOpen(cardState.open === false));
+  entry.bound = true;
+}
+
+/**
+ * Fold or unfold the card.
+ *
+ * `data-ns-open` on the host is the whole contract: the stylesheet reads it to
+ * drop the body and the two-pitch floor when it is "0". The button's accessible
+ * state and name are set here rather than in CSS, because a screen reader is
+ * not a stylesheet - a chevron that turned round still announces the same words
+ * unless the text changes with it.
+ */
+function setCardOpen(open) {
+  cardState.open = open;
+  const m = hosts.card;
+  if (!m) return;
+  m.host.setAttribute("data-ns-open", open ? "1" : "0");
+  const toggle = m.shadow.querySelector(".ns-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    const label = toggle.querySelector(".sr-only");
+    if (label) label.textContent = open ? "Fold the Niche-Scope card" : "Unfold the Niche-Scope card";
+  }
+}
+
 function removeHost(name) {
   const h = hosts[name];
   if (h) {
@@ -230,19 +366,19 @@ function removeHost(name) {
 
 /* ------------------------- Watch-page floating card ------------------------- */
 
-let cardState = { videoId: null, tagsOpen: false, tags: null, coachOpen: false };
+/* `open` is the fold state and belongs to this page's card, not to the video:
+   folding is a thing a reader does to a surface, and it survives moving to the
+   next video in the sidebar. It is deliberately its own field, and it is the only one
+   that decides it: `chartOpen` used to double as the card's expanded flag, so
+   two different questions - "is the card folded" and "is the chart showing" -
+   shared one attribute, and opening the chart silently unfolded the whole card.
+   The chart is part of the card now, so it does not need a flag at all. */
+let cardState = { videoId: null, open: true, publishedAt: null, tagsOpen: false, tags: null, coachOpen: false };
 
 function buildCard() {
-  const m = mountHost("card", 16, 64);
-  if (!m.root.querySelector(".ns-card")) {
-    m.root.innerHTML =
-      '<div class="ns-card ns-surface ns-enter"><div class="ns-head"><span class="dot"></span><h1>Niche-Scope</h1>' +
-      '<button class="close" type="button">×</button></div><div class="ns-body"><p class="ns-note">Loading…</p></div></div>';
-    m.shadow.querySelector(".close").addEventListener("click", () => {
-      removeHost("card");
-      cardState = { videoId: null, tagsOpen: false, tags: null, coachOpen: false };
-    });
-  }
+  const m = mountInlineCard();
+  if (!m) return null;
+  bindCardShell(m);
   return m;
 }
 
@@ -260,6 +396,18 @@ function renderCard(data) {
     return;
   }
   rememberWatchVideo(data);
+  /* The chart's age ranges are measured from publication, so the chart needs the
+     publish date and needs it as epoch ms - which is not the shape the lookup
+     route sends. Parsed once here rather than on every repaint, and a date that
+     will not parse becomes null, which the range module reports as "we do not
+     know when this was published" instead of treating 1970 as the answer.
+     `Date.parse` rather than `new Date(...).getTime()` for the same reason:
+     `new Date(null)` is a valid date and `new Date(undefined)` is Invalid Date,
+     so an absent value has to be checked before it is handed to a constructor
+     that will happily invent a number. */
+  const published = data.video ? data.video.publishedAt : null;
+  cardState.publishedAt = published ? Date.parse(published) || null : null;
+
   const total = data.seo.total;
   const life = data.velocity && data.velocity.vph != null ? data.velocity.vph : null;
   const trend = data.vph && data.vph.vph != null ? data.vph.vph : null;
@@ -269,11 +417,6 @@ function renderCard(data) {
   const rows = [
     `<div class="ns-strip"><span class="k">views</span><span class="v" data-n="${data.video.viewCount}">${fmtT(data.video.viewCount)}</span></div>`
   ];
-  if (life != null) {
-    rows.push(
-      `<div class="ns-strip"><span class="k">velocity</span><span class="v ${spike ? "ns-live ns-glow--live" : "ns-time"}" data-n="${life}" data-s="/hr">${fmtT(life)}/hr${spike ? " ↑" : ""}</span></div>`
-    );
-  }
   if (trend != null) {
     rows.push(
       `<div class="ns-strip"><span class="k">24h trend</span><span class="v ns-time" data-n="${trend}" data-s="/hr">${fmtT(trend)}/hr</span></div>`
@@ -287,27 +430,75 @@ function renderCard(data) {
       `<div class="ns-strip"><span class="k">ch avg</span><span class="v">${fmt(data.channelContext.channelAvgViews)}</span></div>`
     );
   }
-  if (data.outlier != null) {
-    const hot = data.outlier >= 300;
-    // Say which average the number is against: videos we stored, or the
-    // channel's own lifetime record.
-    const basis = data.outlierBasis === "channel" ? "channel avg" : "avg";
-    rows.push(
-      `<div class="ns-strip"><span class="k">vs ${basis}</span><span class="v ${hot ? "ns-live" : "ns-time"}">${fmtT(data.outlier)}%${hot ? " outlier" : ""}</span></div>`
-    );
-  }
   rows.push(`<div class="ns-strip"><span class="k">posted</span><span class="v ns-time">${fmtDate(data.video.publishedAt)}</span></div>`);
   if (data.channel) {
     rows.push(`<div class="ns-strip"><span class="k">channel</span><span class="v">${fmt(data.channel.subscriberCount)} subs</span></div>`);
   }
+
+  /* The three that lead the card, in the order a reader asks for them: is anyone
+     reacting to it, is it doing better than this channel normally does, and is
+     it still moving. Engagement is the one that had no home at all - likes and
+     comments were both on the card as raw counts, and a count of 2.4k likes
+     means nothing on its own without the views it sits against.
+
+     The rate is (likes + comments) / views. Both interaction types count, which
+     is the common definition, and it is stated in the tooltip rather than left
+     implied. It is not a claim about what any particular product calls
+     "engagement" - those differ in the denominator and in whether comments are
+     weighted differently, and this one is ours, so it is labelled with what it
+     divides by.
+
+     A missing comment count is read as zero comments, which is the ordinary
+     reading of a video that has none. A missing like count is not: a video with
+     no reaction data is not a video with a 0% engagement rate, so the whole cell
+     goes rather than showing a confident wrong number. */
+  const stats = [];
+  const views = data.video.viewCount || 0;
+  const reactions = (data.video.likeCount || 0) + (data.video.commentCount || 0);
+  if (views > 0 && (data.video.likeCount != null || data.video.commentCount != null)) {
+    const rate = (reactions / views) * 100;
+    // Below a tenth of a percent, and the one-decimal places are rounding noise.
+    const label = rate < 0.1 ? "<0.1%" : `${rate.toFixed(1)}%`;
+    stats.push(
+      `<div class="ns-stat" title="Likes and comments divided by views"><span class="k">engagement</span><span class="v" data-n="${rate}">${label}</span></div>`
+    );
+  } else {
+    stats.push(
+      `<div class="ns-stat"><span class="k">engagement</span><span class="v ns-na">n/a</span></div>`
+    );
+  }
+  if (data.outlier != null) {
+    // Say which average the number is against: videos we stored, or the
+    // channel's own lifetime record.
+    const basis = data.outlierBasis === "channel" ? "vs channel avg" : "vs avg";
+    stats.push(
+      `<div class="ns-stat" title="Views as a percentage of ${basis.slice(3)}"><span class="k">outlier</span><span class="v ${data.outlier >= 300 ? "ns-live" : ""}">${fmtT(data.outlier)}%</span></div>`
+    );
+  } else {
+    stats.push(
+      `<div class="ns-stat" title="No videos to compare against yet"><span class="k">outlier</span><span class="v ns-na">n/a</span></div>`
+    );
+  }
+  if (life != null) {
+    stats.push(
+      `<div class="ns-stat" title="Views per hour since this video was published"><span class="k">vph</span><span class="v ${spike ? "ns-live" : ""}" data-n="${life}" data-s="/hr">${fmtT(life)}</span></div>`
+    );
+  } else {
+    stats.push(
+      `<div class="ns-stat" title="Needs a publish date to measure a rate"><span class="k">vph</span><span class="v ns-na">n/a</span></div>`
+    );
+  }
+
   s.innerHTML = `
     <div class="ns-score">
       <span class="ns-meter">${segments(total, 12)}</span>
       <span class="ns-reading"><span data-n="${total}">${fmtT(total)}</span><span class="ns-chip ${chip}">${grade}</span></span>
     </div>
     <div class="ns-badges">${cardBadges(data)}</div>
+    <div class="ns-stats">${stats.join("")}</div>
     <div class="ns-strips">${rows.join("")}</div>
     <p class="ns-foot">actionable ${data.seo.actionablePct}%, performance ${data.seo.performancePct}%</p>
+    <div class="ns-chart"></div>
     <div class="ns-actions">
       <button class="ns-btn" type="button" data-a="tags">Tags</button>
       ${prefs.showCoach ? '<button class="ns-btn" type="button" data-a="coach">Ask AI</button>' : ""}
@@ -315,8 +506,207 @@ function renderCard(data) {
     <div class="ns-extras"></div>`;
   animateNums(s);
   bindCardActions();
+  // Unconditional. The chart used to sit behind a "Growth" button, which made
+  // the most informative part of a scorecard something the reader had to ask
+  // for, and meant a video's first week - the only window that says whether it
+  // found an audience - was hidden behind a control with an obvious name.
+  openChart();
   if (cardState.tagsOpen) openTags();
   if (cardState.coachOpen) openCoach();
+}
+
+/*
+ * The growth chart, and what the card is honest about when there is none.
+ *
+ * Three things are worth being straight about here.
+ *
+ * The first is where the history comes from. This app writes a snapshot row
+ * per tracked video, so a video on the watch list has a real series and a
+ * video nobody tracked has none. The card says which of those two it found,
+ * rather than drawing a flat line that reads like "this video stopped growing"
+ * when it means "nobody has been counting".
+ *
+ * The second is the window. The ranges are measured from the day the video was
+ * published, not from today - see lib/chartRange.js for why, and for the two
+ * different kinds of "we do not have that" the card can be in. What matters
+ * here is that a range is a different cut of readings this card already holds,
+ * not a different question to the server, so switching tabs is local and the
+ * four tabs cannot race each other.
+ *
+ * The third is the height. The card is never smaller than two rows and is as
+ * tall as its content above that, so the list below starts lower by exactly
+ * however much the card grew. The chart is part of the card rather than behind a
+ * button, so that height is settled when the card is built instead of changing
+ * while someone is reading it. The list is pushed by the card's real height, so
+ * a taller card simply pushes it further.
+ */
+
+const CHART_RANGES = globalThis.NS_CHART_RANGE ? globalThis.NS_CHART_RANGE.RANGES : [];
+
+/** Points needed before a line is worth drawing rather than two dots and a gap. */
+const CHART_MIN_POINTS = 3;
+
+/* The whole series, fetched once per video and then re-cut locally for each
+   range. It used to be a request per tab, which meant the age ranges - the ones
+   measured from publication - could not work: they all need the same readings,
+   only counted from a different day. One request for the full window, four
+   ranges cut from it, and switching tabs costs nothing and cannot race. */
+let chartState = { videoId: null, range: "7d", data: null, loaded: false };
+
+function chartHost() {
+  const m = hosts.card;
+  return m ? { m, box: m.shadow.querySelector(".ns-chart"), host: m.host } : null;
+}
+
+/**
+ * Load the series if it is not already here, then draw the range.
+ *
+ * There is no close function any more. The chart was behind a button, and a
+ * button on a panel that is supposed to be a scorecard made the single most
+ * informative thing on it something you had to ask for - and clicking a range
+ * tab then re-fetched the same data it already had. It is simply part of the
+ * card now, and a video with no history says so in its own space.
+ */
+function openChart() {
+  const c = chartHost();
+  if (!c || !c.box) return;
+  if (!cardState.videoId) return;
+
+  const want = cardState.videoId;
+  const paint = () => {
+    const live = chartHost();
+    if (live && live.box && cardState.videoId === want) paintChart(live.box, chartState.data, chartState.range);
+  };
+
+  if (chartState.videoId === want && chartState.loaded) {
+    paint();
+    return;
+  }
+
+  c.box.innerHTML = '<div class="ns-skeleton"><span></span><span></span></div>';
+  api(`/api/videos/history?videoId=${encodeURIComponent(want)}&days=90`)
+    .then((res) => {
+      // The reader may have moved on while this was in flight.
+      if (!cardState.videoId || cardState.videoId !== want) return;
+      const data = res && res.ok ? res.data : null;
+      chartState = { videoId: want, range: chartState.range || "7d", data, loaded: true };
+      paint();
+    })
+    .catch(() => {
+      if (cardState.videoId === want) {
+        c.box.innerHTML = '<p class="ns-note ns-note--bad">Could not load the growth history. Is the server running?</p>';
+      }
+    });
+}
+
+/**
+ * Draw the range, or say why it cannot be drawn.
+ *
+ * Two different absences, and the card has to tell them apart. A video nobody
+ * tracked has no readings at all. A video that was tracked has readings, but the
+ * window its range tab names may start before the ones this app keeps - and
+ * drawing the part that exists under a tab that says "1st 7 days" would be a lie
+ * told by the control the reader just clicked. The selection hands back whether
+ * it is whole, and the note under the chart says which piece is missing.
+ */
+function paintChart(box, data, rangeKey) {
+  const ranges = globalThis.NS_CHART_RANGE ? globalThis.NS_CHART_RANGE.RANGES : CHART_RANGES;
+  const range = ranges.find((r) => r.key === rangeKey) || ranges[0];
+  const tabs = `<div class="ns-chart-tabs" role="group" aria-label="Time range">${ranges
+    .map((r) => `<button class="ns-chart-tab" type="button" data-range="${r.key}" aria-pressed="${r.key === range.key}">${r.label}</button>`)
+    .join("")}</div>`;
+
+  const wire = () => {
+    box.querySelectorAll(".ns-chart-tab").forEach((btn) => {
+      btn.onclick = () => {
+        const picked = ranges.find((r) => r.key === btn.dataset.range);
+        if (!picked) return;
+        chartState.range = picked.key;
+        // No request: the full series is already in hand and a range is a
+        // different cut of it. Anything the reader can do twice does not need
+        // the network for the second time.
+        const live = chartHost();
+        if (live && live.box) paintChart(live.box, chartState.data, picked.key);
+      };
+    });
+  };
+
+  const points = data && Array.isArray(data.points) ? data.points : [];
+  if (!points.length) {
+    box.innerHTML =
+      tabs +
+      '<p class="ns-note">No growth history yet. This app records a reading each time it polls, and it only ' +
+      'polls videos on your watch list. Add this video to tracking and the line fills in as the days pass.</p>';
+    wire();
+    return;
+  }
+
+  const pick = globalThis.NS_CHART_RANGE.select(points, {
+    range: range.key,
+    publishedAt: cardState.publishedAt,
+    now: Date.now()
+  });
+  const shown = pick.points;
+
+  if (shown.length < CHART_MIN_POINTS) {
+    // The window exists but is too thin to draw a slope across. Saying so beats
+    // two dots and a straight line between them, which reads as a measured
+    // trend nobody actually measured.
+    box.innerHTML = tabs + `<p class="ns-note">${fmtDateWindow(pick, range)}</p>`;
+    wire();
+    return;
+  }
+
+  const views = shown.map((p) => p.views);
+  const first = views[0];
+  const last = views[views.length - 1];
+  const gained = last - first;
+  const perDay = pick.reason ? 0 : Math.round(gained / (shown.length - 1));
+
+  // The path arithmetic lives in lib/chartRange.js, not here, because a flat
+  // series is a real case and a special case buried in a template string is a
+  // special case nobody finds again.
+  const g = globalThis.NS_CHART_RANGE.geometry(shown, { width: 260, height: 88 });
+  const W = g.width;
+  const H = g.height;
+
+  const firstDay = new Date(shown[0].t);
+  const lastDay = new Date(shown[shown.length - 1].t);
+  const fmtDay = (d) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  // Two identical labels under one axis look like a rendering fault rather than
+  // a short series, and the readings are bucketed per day, so a range can land
+  // both ends on the same date. Printed once rather than twice.
+  const fromLabel = fmtDay(firstDay);
+  const toLabel = fmtDay(lastDay);
+  const axis = fromLabel === toLabel ? `<span>${fromLabel}</span>` : `<span>${fromLabel}</span><span>${toLabel}</span>`;
+
+  const delta = pick.truncated
+    ? ""
+    : ` <span class="ns-chart-delta">${gained >= 0 ? "+" : ""}${fmtT(gained)} · ${fmtT(perDay)}/day</span>`;
+
+  box.innerHTML =
+    tabs +
+    `<div class="ns-chart-num">${fmtT(last)}</div>` +
+    `<div class="ns-chart-lab">views${delta}</div>` +
+    `<svg class="ns-chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" ` +
+    `aria-label="Views ${g.flat ? "unchanged at" : "rising from"} ${fmtT(first)} to ${fmtT(last)} across ${shown.length} days">` +
+    `<defs><linearGradient id="ns-chart-gradient" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop class="ns-chart-stop-0" offset="0"/><stop class="ns-chart-stop-1" offset="1"/>` +
+    `</linearGradient></defs>` +
+    (g.area ? `<path class="ns-chart-fill" d="${g.area}" fill="url(#ns-chart-gradient)"/>` : "") +
+    `<line class="ns-chart-base" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>` +
+    `<path d="${g.line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
+    `</svg>` +
+    `<div class="ns-chart-ax">${axis}</div>` +
+    (pick.reason ? `<p class="ns-chart-note">${pick.reason}</p>` : "");
+  wire();
+}
+
+/** The sentence for a window that exists but is too thin to draw. */
+function fmtDateWindow(pick, range) {
+  if (pick.reason) return pick.reason;
+  const held = pick.points.length;
+  return `Only ${held} reading${held === 1 ? "" : "s"} in the ${range.label} window - too few to draw a trend. Add this video to tracking and it fills in as the days pass.`;
 }
 
 function cardBadges(data) {
@@ -471,7 +861,13 @@ function openCoach() {
 }
 
 function showWatchCard(videoId) {
-  buildCard();
+  // A new video means a new series. Keeping the last one's points would draw
+  // this video's card with the previous video's growth on it.
+  if (cardState.videoId && cardState.videoId !== videoId) {
+    chartState = { videoId: null, range: "7d", data: null, loaded: false };
+    cardState.publishedAt = null;
+  }
+  if (!buildCard()) return;
   cardState.videoId = videoId;
   const s = cardBody();
   if (s) s.innerHTML = '<p class="ns-note">Loading.</p>';
@@ -1133,6 +1529,12 @@ function stripLines() {
 }
 
 function onDomChange() {
+  // YouTube rebuilds the sidebar whenever the page settles, which takes the
+  // card out of the list with it. Put it back before scanning, so the strips
+  // land on a list that already has its card. mountInlineCard is a no-op when
+  // the card is already in the right place, so this costs nothing on a pass
+  // that did not touch the list.
+  if (prefs.showCard && currentLocation().type === "watch") mountInlineCard();
   scanHoverIcons();
   scanTiles();
 }

@@ -242,24 +242,127 @@
 
 /* ---------------------------------- Strips --------------------------------- */
 
-.ns-strips {
+/* --------------------------- The three headline numbers ---------------------------
+
+   This block is why the card stopped looking borrowed. Every number used to get
+   its own full-width row - views, velocity, trend, likes, channel average,
+   outlier, posted, channel - so eight values of identical importance arrived as
+   a scroll of eight, and a scroll of eight is a list, not a panel. The panel
+   this is modelled on leads with the three a reader is actually looking for,
+   in one row of equal columns with the label above the value, and that row is
+   the first thing the eye lands on. Everything else demotes to a compact
+   two-column list underneath.
+
+   Equal columns, not content-sized: the numbers are different lengths, and if
+   each column took its own width the row would lean and the eye would read it
+   as a table rather than as three peers.
+
+   Tabular figures matter more here than anywhere else on the card. Three numbers
+   sit shoulder to shoulder and animate from zero at the same time, and with
+   proportional digits each one changes width as it counts, so the row visibly
+   writhes. Fixed-width digits make the row hold still while the numbers move,
+   which is what makes the animation read as counting instead of as reflow. */
+.ns-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grouped by a hairline and the gap, not by a filled cell. A fill was tried and
+   it is arithmetically impossible in the light theme: the accent colours are
+   dark enough to read on white but not on any grey between #ececec and #f8f8f8,
+   so a filled cell pushed amber to 4.23:1 and cyan to 4.19:1 against a 4.5
+   floor. A border is the right instrument anyway - it groups without putting a
+   second surface behind the text, so every colour on this row is measured
+   against the card and the numbers hold in both themes. */
+.ns-stat {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 4px;
+  border: 1px solid var(--ns-hair);
+  border-radius: 12px;
+  text-align: center;
+}
+
+/* 11px is the size the secondary text sits at elsewhere on the card, on purpose:
+   a label that competes with its own value is what turned the readings into
+   shouting. It is a label, and it gets to be quieter than the number under it. */
+.ns-stat .k {
+  font-family: var(--ns-font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ns-mute);
+  line-height: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ns-stat .v {
+  font-family: var(--ns-font-read);
+  font-size: 17px;
+  font-weight: var(--ns-w-read-strong);
+  font-variation-settings: "wght" var(--ns-w-read-strong);
+  color: var(--ns-ink);
+  line-height: 21px;
+  white-space: nowrap;
+}
+
+.ns-stat .v.ns-live {
+  color: var(--ns-amber);
+}
+
+.ns-stat .v.ns-time {
+  color: var(--ns-cyan);
+}
+
+.ns-stat .v.ns-dead {
+  color: var(--ns-bad);
+}
+
+/* "n/a" is not an error. Red on a video we have no reaction data for says the
+   card thinks something went wrong, which is a different and wrong claim - and
+   the error red only reached 4.13:1 on this surface anyway. Muted ink says what
+   it means: we do not know, and here is the cell so you can see we know that we
+   do not know. */
+.ns-stat .v.ns-na {
+  color: var(--ns-mute);
+}
+
+/* The readings that are not the headline three, in two columns. auto-fit and a
+   minmax floor rather than a hard two, because this card also has to survive a
+   collapsed sidebar: at two fixed columns a narrow column squeezes six values
+   into a phone's width and the labels start cutting each other off, whereas
+   auto-fit drops to one column and every value gets the whole row. */
+.ns-strips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 2px 10px;
 }
 
 .ns-strip {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
 }
 
+/* Half the width now, so a label has to be allowed to run out of room and stop.
+   Ellipsis beats wrapping: a two-line label pushes its own value down and the
+   grid row grows to the tallest thing in it, so one long label ("vs channel
+   avg") would double the height of the pair it sits next to. */
 .ns-strip .k {
   font-family: var(--ns-font-ui);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ns-mute);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ns-strip .v {
@@ -631,6 +734,272 @@
   height: 10px;
   background: var(--ns-tick);
   border-radius: 1px;
+}
+
+/* --------------------------------- Growth chart --------------------------------
+
+   The one place the card is allowed to be the loudest thing in the sidebar:
+   a line that says whether a video is still moving is the reason to keep
+   reading, and everything around it stays quiet so the line is the first thing
+   the eye lands on. The chart lives inside the card, so when it opens the
+   card grows and the list below moves down - there is no overlay and nothing
+   to dismiss. */
+
+.ns-chart:empty {
+  display: none;
+}
+
+.ns-chart {
+  margin: 10px 0 2px;
+  color: var(--ns-cyan);
+}
+
+/* The range tabs sit above the number, not below the chart. That is the
+   reference's arrangement and it is the better one: the tabs answer "which
+   window am I looking at", and putting the window's own value underneath it
+   means the reader reads the number and only then finds out which number it is.
+   At the bottom, the value is the first thing the eye lands on and the window is
+   a footnote, which is backwards for a control that changes the whole chart. */
+.ns-chart-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.ns-chart-tab {
+  flex: 1;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ns-mute);
+  background: transparent;
+  border: 1px solid var(--ns-hair);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.ns-chart-tab:hover {
+  color: var(--ns-ink);
+  border-color: var(--ns-cyan);
+}
+
+.ns-chart-tab[aria-pressed="true"] {
+  color: var(--ns-ink);
+  border-color: var(--ns-cyan);
+  background: var(--ns-e3);
+}
+
+.ns-chart-tab:focus-visible {
+  outline: 2px solid var(--ns-cyan);
+  outline-offset: 1px;
+}
+
+/* The number the chart is about, and then the small line that says what it is.
+   Twenty-six pixels against ten is the reference's ratio and it is a real one:
+   a number only reads as the headline of a block if it is unambiguously larger
+   than everything beside it, and eleven against thirteen is a caption trying to
+   be a heading. */
+.ns-chart-num {
+  font-family: var(--ns-font-read);
+  font-size: 26px;
+  font-weight: var(--ns-w-read-strong);
+  font-variation-settings: "wght" var(--ns-w-read-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  color: var(--ns-ink);
+}
+
+.ns-chart-lab {
+  font-family: var(--ns-font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ns-mute);
+  margin-bottom: 8px;
+}
+
+/* The change, beside the label rather than under the number, so the number
+   keeps the left edge to itself and reads as one thing. */
+.ns-chart-delta {
+  font-family: var(--ns-font-ui);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ns-mute);
+  margin-left: 6px;
+}
+
+.ns-chart-svg {
+  display: block;
+  width: 100%;
+  height: 88px;
+  color: var(--ns-cyan);
+  overflow: visible;
+}
+
+.ns-chart-fill {
+  color: var(--ns-cyan);
+  opacity: 0.18;
+}
+
+/* The area's gradient. An SVG gradient needs its element in the markup, but
+   the colours are styling like everything else and belong here - a stop-colour
+   in a template string is the hand-maintained copy this stylesheet exists to
+   replace, and it drifts from a theme change with nothing noticing. The script
+   builds the geometry and names these two stops; it does not decide what they
+   look like. */
+.ns-chart-stop-0 {
+  stop-color: var(--ns-cyan);
+  stop-opacity: 0.32;
+}
+
+.ns-chart-stop-1 {
+  stop-color: var(--ns-cyan);
+  stop-opacity: 0;
+}
+
+/* A horizontal baseline under the area, so a chart that never rises off the
+   bottom still has something to be read against instead of looking like a
+   shaded block that failed to load. */
+.ns-chart-base {
+  stroke: var(--ns-tick);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.ns-chart-ax {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ns-mute);
+}
+
+/* When the range is not the whole of what its tab claims - readings this app
+   never took, or a video too young to have filled the window - the chart says
+   so instead of drawing a confident shape. Small and muted, because it is a
+   caveat and not a second headline, but never hidden. */
+.ns-chart-note {
+  font-family: var(--ns-font-ui);
+  font-size: 10.5px;
+  line-height: 14px;
+  color: var(--ns-mute);
+  margin-top: 6px;
+}
+
+/* ------------------------- The in-flow watch card's height -------------------------
+
+   The card is inside this shadow root, so the page's own stylesheet cannot
+   reach it and the height has to be declared here. :host() is what lets a rule
+   inside the shadow root talk about the element the root is attached to, which
+   is how the open and folded states are told apart.
+
+   Open, the card is never smaller than the space of two videos, and is as tall
+   as its content above that. It used to be capped at two videos instead, and
+   that was wrong: the reference panel this is modelled on runs 800-1200px, and
+   the reader chose that over a clipped card. So two pitches is a floor, not a
+   ceiling, and it is still worth stating because it is the one number that
+   holds at any width - a narrow sidebar wraps titles to two lines and makes
+   every row taller, and the floor follows it.
+
+   The rows below are never hidden, reordered or overlaid. They are pushed down,
+   because the card is an ordinary block sitting in the list ahead of them, and
+   a taller card simply pushes them further.
+
+   The pitch comes from a measurement taken at mount time and handed in as a
+   custom property on the host, not from a number written here. */
+:host(.ns-host--inline) .ns-card {
+  min-height: calc(var(--ns-tile-pitch, 122px) * 2);
+  box-sizing: border-box;
+}
+
+/* Folded, not dismissed. The card stays mounted and stays in the list, so
+   there is nothing to re-insert and nothing for the re-render pass to race -
+   which is the whole reason folding replaced a close button that destroyed the
+   host. What goes is the body and the floor, leaving the header standing as the
+   thing the reader unfolds it with. */
+:host(.ns-host--inline[data-ns-open="0"]) .ns-card {
+  min-height: 0;
+  overflow: hidden;
+}
+
+:host(.ns-host--inline[data-ns-open="0"]) .ns-body {
+  display: none;
+}
+
+/* The fold control, and the focus ring every control on this card was missing.
+   The chart tabs had one; the header toggle and the action buttons did not, so
+   a keyboard reader could land on them and see nothing. */
+/* Visually hidden, still announced. The fold control is an icon, and an icon
+   button with no text has no accessible name - the label lives here so a screen
+   reader reads "Fold the Niche-Scope card" while the chevron is the only thing
+   on screen. Not `display:none`, which would take it out of the accessibility
+   tree along with the visual. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ns-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ns-radius);
+  background: transparent;
+  color: var(--ns-mute);
+  cursor: pointer;
+}
+
+.ns-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ns-toggle:hover {
+  color: var(--ns-ink);
+  background: var(--ns-e3);
+}
+
+.ns-toggle:focus-visible,
+.ns-btn:focus-visible,
+.ns-head .close:focus-visible,
+.ns-chipbtn:focus-visible {
+  outline: 2px solid var(--ns-cyan);
+  outline-offset: 1px;
+}
+
+/* The chevron points down while open - there is more below, and folding is what
+   gets you to it - and up while folded, because the body is behind that edge.
+   The rotation is motion, so it lives inside the no-preference block per the
+   reduced-motion rule, and the folded state gets its rotation from the same
+   block so the two never disagree about whether rotating is allowed. */
+@media (prefers-reduced-motion: no-preference) {
+  .ns-toggle svg {
+    transform: rotate(180deg);
+    transition: transform var(--ns-motion) ease;
+  }
+
+  :host(.ns-host--inline[data-ns-open="0"]) .ns-toggle svg {
+    transform: rotate(0deg);
+  }
 }
 
 /* --------------------------------- Motion ---------------------------------- */

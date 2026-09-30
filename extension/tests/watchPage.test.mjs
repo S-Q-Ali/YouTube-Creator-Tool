@@ -86,14 +86,19 @@ describe("the up-next list gets the same strips a grid gets", () => {
   it("visits each video once even when two hosts both contain it", () => {
     // The live page nests a ytd-item-section-renderer inside
     // ytd-watch-next-secondary-results-renderer, and both names are in
-    // HOSTS. So one video is reachable through two hosts, and the scan used to
-    // hand it over twice - six visits for three videos, against a budget of 50.
-    // The consequence is not cosmetic: a visitor that has not yet attached its
-    // strip sees the same tile twice and attaches two, and on a real page the
-    // sidebar then carries doubled readings on every video.
+    // HOSTS, so one video is reachable through two hosts and the scan handed it
+    // over twice - six visits for three videos.
     //
-    // The old fixture did not nest two hosts, which is exactly why this shipped
-    // unnoticed - the fixture was a guess, and the guess did not contain the
+    // What that cost, precisely, because it is worth not overstating: the strip
+    // pass appends its line and sets the mark before returning, so the second
+    // visit was already skipped by isLined. There was never a second strip on
+    // screen. The real costs were that the scan budget was spent twice as fast,
+    // so a watch page reached the cap after half as many videos, and that the
+    // hover pass - which asks for lined cards back on purpose - did the work
+    // twice for every card.
+    //
+    // The old fixture did not nest two hosts, which is why this shipped
+    // unnoticed: the fixture was a guess, and the guess did not contain the
     // structure that breaks.
     const visited = [];
     const { NS_TILES } = globalThis;
@@ -102,6 +107,18 @@ describe("the up-next list gets the same strips a grid gets", () => {
     });
     expect(visited.length).toBe(3);
     expect(new Set(visited).size).toBe(3);
+  });
+
+  it("spends the scan budget once per video, not once per host that holds it", () => {
+    // The half-as-many-videos consequence, stated as its own assertion. A
+    // budget of 2 over a three-video sidebar used to be exhausted by the first
+    // host alone, so the second video and the third never got a strip.
+    const { NS_TILES } = globalThis;
+    const seen = [];
+    NS_TILES.each(NS_TILES.scanRoot("/watch?v=" + VIDEO, VIDEO), 2, (tile, id) => {
+      seen.push(id);
+    });
+    expect(seen).toEqual(["UpNext0000001", "UpNext0000002"]);
   });
 
   it("leaves the video you are already watching alone", () => {

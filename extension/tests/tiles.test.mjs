@@ -36,6 +36,25 @@ describe("finding the cards worth annotating", () => {
     expect(first.id).toBe("gEQ0BLyVJhY");
   });
 
+  /*
+   * A playlist watch has two subjects on screen and they are not the same one.
+   * `/watch?v=X&list=Y` shows video X inside playlist Y: the sidebar is the
+   * playlist, but the card on top of it is the scorecard for X. Reading the
+   * playlist's first entry instead would show a card about a video the reader
+   * is not watching, sitting above the video they opened.
+   */
+  it("reads the watched video, not the playlist, off a playlist watch link", () => {
+    const { idFromHref } = globalThis.NS_TILES;
+    const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabcdef123&index=4";
+    expect(idFromHref(url, url)).toBe("dQw4w9WgXcQ");
+  });
+
+  it("reads the watched video even when the playlist parameter comes first", () => {
+    const { idFromHref } = globalThis.NS_TILES;
+    const url = "https://www.youtube.com/watch?list=PLabcdef123&v=dQw4w9WgXcQ&t=42s";
+    expect(idFromHref(url, url)).toBe("dQw4w9WgXcQ");
+  });
+
   it("skips a card that already carries a strip", () => {
     expect(collect(50).map((x) => x.id)).not.toContain("aBcDeFgHiJk");
   });
