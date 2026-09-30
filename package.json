@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:contrast": "vitest run extension/tests/theme.test.mjs -t \"contrast floor\"",
     "backup": "node scripts/backup.ts backup",
     "restore-backup": "node scripts/backup.ts restore"
   },
