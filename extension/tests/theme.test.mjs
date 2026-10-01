@@ -22,10 +22,14 @@ const root = resolve(process.cwd(), "extension");
 const read = (p) => readFileSync(resolve(root, p), "utf8");
 
 const theme = read("ns-theme.css");
-const positioning = read("content.css");
+// Every stylesheet that positions a host. studio.css joins content.css here
+// because the Studio surfaces are hosts too, and a class defined in a file this
+// test never reads reads as undefined - which would make the invariant below
+// enforce a lie rather than a rule.
+const positioning = read("content.css") + "\n" + read("studio.css");
 const stylesheet = theme + "\n" + positioning;
 
-const SOURCES = ["content.js", "popup.js", "background.js", "lib/thumb.js", "lib/lineModel.js", "lib/tiles.js", "lib/nsMeta.js", "popup.html"];
+const SOURCES = ["content.js", "studio.js", "popup.js", "background.js", "lib/thumb.js", "lib/lineModel.js", "lib/tiles.js", "lib/nsMeta.js", "lib/studioRoute.js", "popup.html"];
 
 const isOurs = (token) => token.startsWith("ns-");
 

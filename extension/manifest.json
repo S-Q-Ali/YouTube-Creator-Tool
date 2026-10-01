@@ -18,12 +18,18 @@
       "js": ["lib/nsMeta.js", "lib/tiles.js", "lib/lineModel.js", "lib/chartRange.js", "lib/placement.js", "lib/thumb.js", "content.js"],
       "css": ["ns-theme.css", "content.css"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://studio.youtube.com/*"],
+      "js": ["lib/studioRoute.js", "studio.js"],
+      "css": ["studio.css"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["ns-theme.css"],
-      "matches": ["*://www.youtube.com/*"]
+      "matches": ["*://www.youtube.com/*", "*://studio.youtube.com/*"]
     }
   ]
 }

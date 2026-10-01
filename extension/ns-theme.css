@@ -1042,6 +1042,53 @@
   animation: ns-glow 900ms var(--ns-motion) ease-out;
 }
 
+/* Studio debug readout. A developer surface, not a creator surface: it names the
+   route the classifier found and nothing else, so that "the extension did
+   nothing" can be told apart from "the extension was looking at the wrong page".
+   It uses only tokens the card already paints text with, so it inherits the
+   contrast floor the theme tests enforce for every other surface here. */
+.ns-studio-debug {
+  gap: 10px;
+}
+
+.ns-studio-debug__title {
+  margin: 0;
+  font-family: var(--ns-font-read);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ns-cyan);
+}
+
+.ns-studio-debug__body {
+  display: grid;
+  gap: 2px;
+}
+
+.ns-studio-debug__row {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ns-mute);
+}
+
+.ns-studio-debug__row b {
+  font-family: var(--ns-font-read);
+  font-weight: 600;
+  color: var(--ns-ink);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.ns-studio-debug__row--state b {
+  color: var(--ns-amber);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ns-enter {
     animation: none;

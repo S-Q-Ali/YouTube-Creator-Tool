@@ -1,0 +1,29 @@
+/* Niche-Scope on YouTube Studio: where the Studio surfaces sit on the page.
+ *
+ * Component styling is not here. ns-theme.css owns every component - panel,
+ * card, note, chip - and this extension's rule is that a second copy of the
+ * design system is how the first one drifted. This file positions hosts and
+ * nothing else, the same division content.css keeps.
+ */
+
+/* The Studio debug panel is a fixed corner overlay rather than an in-flow block.
+   It is the one surface we add to Studio uninvited, and only when the
+   nsdebug=1 flag or the stored setting asked for it.
+   The modifier is written on its own rather than as `.ns-host.ns-host--...` so
+   the theme test's floating-panel rule keeps matching the watch panels and not
+   this one - a debug readout has no reason to claim a viewport-sized panel. */
+.ns-host--studio-debug {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  z-index: 2147483000;
+}
+
+/* Nothing is mounted into Studio's own DOM. This host is appended to <body> as
+   a sibling of everything else and styled entirely inside its shadow root, so
+   Studio's stylesheet cannot reach in and ours cannot leak out. */
+[data-ns-studio-debug] {
+  all: initial;
+}
