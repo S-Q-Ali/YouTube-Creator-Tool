@@ -8,6 +8,13 @@ import DashboardSnapshot from "@/components/DashboardSnapshot";
 
 export const dynamic = "force-dynamic";
 
+// Every `desc` here is a promise a user will check, so each one names only what
+// the code behind that link actually fetches or computes. The audit card is the
+// trap: YouTube Analytics will hand an API key search terms, traffic sources and
+// a retention curve, so those read as free wins — but lib/ownanalytics.ts asks
+// for views, watch time, subscribers, duration, likes and comments only, and
+// nothing here derives a posting time. Widen a card only after widening the
+// query behind it, and keep its wording identical to the page it links to.
 const TOOLS = [
   {
     href: "/keywords",
@@ -30,7 +37,7 @@ const TOOLS = [
   {
     href: "/audit",
     title: "Channel Audit",
-    desc: "Connect your channel via OAuth for top search terms, traffic sources, retention, and best time to post.",
+    desc: "Connect your channel via OAuth for 28-day views, watch time, subscriber growth, and engagement.",
     cta: "Run an audit",
   },
   {
