@@ -79,6 +79,17 @@ describe("recognising the Studio surfaces", () => {
     expect(R().classify("https://studio.youtube.com/video/v1/analytics/tab-realtime").tab).toBe("realtime");
   });
 
+  it("cuts a period suffix off a tab name rather than reporting it as the tab", () => {
+    // The confirmed URLs carry the period as its own segment, so this shape is
+    // not one that has been seen. It is tested anyway because it is the shape a
+    // future Studio change would most plausibly produce by joining two segments
+    // that are separate today, and "audience-period-default" is a tab name that
+    // does not exist.
+    const glued = R().classify("https://studio.youtube.com/channel/UC1/analytics/tab-audience-period-default");
+    expect(glued.kind).toBe("channel-analytics");
+    expect(glued.tab).toBe("audience");
+  });
+
   it("survives the shapes Studio actually throws at a classifier", () => {
     const awkward = [
       ["https://studio.youtube.com/channel/UC1/content/", "content"],
@@ -96,9 +107,7 @@ describe("recognising the Studio surfaces", () => {
     const others = [
       "https://studio.youtube.com/",
       "https://studio.youtube.com/channel/",
-      "https://studio.youtube.com/channel/UC1",
       "https://studio.youtube.com/video/",
-      "https://studio.youtube.com/video/v1",
       "https://studio.youtube.com/anything/else/here",
       "",
       null,
@@ -107,6 +116,14 @@ describe("recognising the Studio surfaces", () => {
     for (const url of others) {
       expect(R().classify(url).kind, String(url)).toBe("unknown");
     }
+  });
+
+  it("names a bare channel or video root rather than calling it unknown", () => {
+    // /channel/<id> and /video/<id> are real Studio pages - the channel
+    // dashboard and a video's overview. Calling them unknown would lose the id
+    // the next modules need, so they are named and simply left not actionable.
+    expect(R().classify("https://studio.youtube.com/channel/UC1")).toEqual({ kind: "channel-home", channelId: "UC1" });
+    expect(R().classify("https://studio.youtube.com/video/v1")).toEqual({ kind: "video-home", videoId: "v1" });
   });
 
   it("reports an unrecognised section as itself, not as unknown", () => {

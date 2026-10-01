@@ -32,8 +32,13 @@
     if (raw.charAt(0) !== "/") {
       try {
         return new URL(raw).pathname.split("/").filter(Boolean);
-      } catch (err) {
-        return [];
+      } catch {
+        // A host-relative string with no scheme - "studio.youtube.com/video/v1/edit"
+        // - is not a URL, but it is still a path once the host is dropped. Parsing
+        // is tried first because a scheme-ful string that fails to parse really is
+        // nothing, and guessing at it would turn nonsense into a route.
+        const parts = raw.split("?")[0].split("#")[0].split("/").filter(Boolean);
+        return parts[0] && parts[0].indexOf(".") !== -1 ? parts.slice(1) : [];
       }
     }
     return raw.split("?")[0].split("#")[0].split("/").filter(Boolean);
@@ -44,7 +49,16 @@
   // to sit at a fixed position; Studio has already moved it once.
   function tabOf(segments) {
     for (const segment of segments) {
-      if (segment.indexOf("tab-") === 0) return segment.slice(4);
+      // "tab-overview" -> "overview", and "tab-audience-period-default" ->
+      // "audience". The real URLs carry a period segment of their own, but a
+      // period suffix has been glued onto the tab before, and reading
+      // "audience-period-default" as the tab name would show a creator a tab
+      // that does not exist. So the segment is cut at the first hyphen.
+      if (segment.indexOf("tab-") === 0) {
+        const rest = segment.slice(4);
+        const cut = rest.indexOf("-");
+        return cut === -1 ? rest : rest.slice(0, cut);
+      }
     }
     return null;
   }

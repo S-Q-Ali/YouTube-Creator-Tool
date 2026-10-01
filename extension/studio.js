@@ -76,13 +76,12 @@ function panelHost() {
   return host;
 }
 
-function describe(route, tab) {
-  const id = route.channelId || route.videoId;
+function describe(route) {
   const rows = [
     ["route", route.kind],
     ["channel", route.channelId || "—"],
     ["video", route.videoId || "—"],
-    ["tab", tab || "—"],
+    ["tab", route.tab || "—"],
     ["path", location.pathname],
   ];
   return rows.map(([label, value]) => '<p class="ns-studio-debug__row"><span>' + label + "</span><b>" + value + "</b></p>").join("");
