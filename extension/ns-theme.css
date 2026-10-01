@@ -1,5 +1,5 @@
 /* Niche-Scope Shared Theme ("Transmission") — canonical tokens + components.
- * Shadow-DOM surfaces mirror these tokens via NS_TOKENS in content.js — keep in sync.
+ * Shadow roots adopt this file directly, so there is no second copy to keep in sync.
  * Every root element carries data-ns-theme so tokens never leak onto the host page. */
 
 [data-ns-theme] {
@@ -838,6 +838,10 @@
 
 .ns-chart-fill {
   color: var(--ns-cyan);
+  /* The wash's one strength control. The stops below run 1 -> 0, so the fill's
+     alpha is this number at the line and zero at the baseline. (An opacity here
+     AND a stop-opacity on the top stop would multiply - the two knobs once
+     stacked to a ~6% wash nobody could see.) */
   opacity: 0.18;
 }
 
@@ -849,7 +853,7 @@
    look like. */
 .ns-chart-stop-0 {
   stop-color: var(--ns-cyan);
-  stop-opacity: 0.32;
+  stop-opacity: 1;
 }
 
 .ns-chart-stop-1 {
