@@ -11,7 +11,7 @@ it.
 
 | Check | Command | Bar |
 | --- | --- | --- |
-| Tests | `npx vitest run` | **157 minimum**, 0 failing (currently 236) |
+| Tests | `npx vitest run` | **157 minimum**, 0 failing (currently 237) |
 | Types | `npm run typecheck` | 0 errors |
 | Lint (extension) | `npx eslint extension` | 0 problems |
 | Lint (repo) | `npx eslint .` | baseline, do not regress |
