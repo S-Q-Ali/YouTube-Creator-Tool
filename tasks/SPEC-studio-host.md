@@ -35,6 +35,32 @@ Stories:
    this module depends on it being up.
 5. Correct me now or I proceed on these.
 
+## Confirmed route shapes
+
+Taken from a live channel, not from documentation and not from my guesses:
+
+| URL | Surface |
+|---|---|
+| `/channel/UCK_lVZeITq1EJ0abLTO-pvQ` | Channel home |
+| `/channel/UCK_lVZeITq1EJ0abLTO-pvQ/content` | Content table |
+| `/channel/UCK_lVZeITq1EJ0abLTO-pvQ/analytics/tab-overview/period-default` | Channel analytics |
+| `/video/M1HRZS7H5g4/edit` | Edit, one video |
+| `/video/M1HRZS7H5g4/analytics/tab-overview/period-default` | One video's analytics |
+
+Two corrections this forces on the design:
+
+- The Content surface is `/content`, not `/videos`. A shape match built on the
+  old guess would have matched nothing and shipped a silent no-op.
+- A video is addressed as `/video/<id>/...`, **not** a query parameter. There is
+  no `?id=` to read.
+- The channel id is `UCK…`, not `UC` plus a fixed length. The classifier must not
+  validate id shape. A wrong-length check is a check that fails on the next
+  channel someone sends, so ids are treated as opaque path segments.
+
+Still unconfirmed: the URL for a **new upload**, and whether Studio exposes an
+analytics surface per tab beyond `tab-overview`. Both are asked in Open
+Questions rather than assumed.
+
 ## Commands
 
 ```
@@ -152,8 +178,9 @@ reader would otherwise get wrong.
 - Should the debug overlay live inside a shadow root like every other surface,
   or sit as a plain fixed panel? Shadow root keeps Studio's CSS from reaching it
   and ours from leaking; a plain panel is easier to inspect in DevTools.
-- Real Studio URL shapes should be confirmed against a live channel before the
-  table-driven test is frozen, otherwise the tests certify my guesses.
+- The upload URL and the analytics tab names are still unconfirmed, so the
+  table-driven suite covers only the five shapes above plus malformed input. It
+  grows when the real shapes are known, rather than certifying a guess now.
 - Next.js route work is out of this module, but note for later: `AGENTS.md`
   requires reading `node_modules/next/dist/docs/` before writing any Next code in
   this repo.
