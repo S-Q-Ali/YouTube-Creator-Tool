@@ -531,7 +531,7 @@ function renderCard(data) {
  * different kinds of "we do not have that" the card can be in. What matters
  * here is that a range is a different cut of readings this card already holds,
  * not a different question to the server, so switching tabs is local and the
- * four tabs cannot race each other.
+ * tabs cannot race each other.
  *
  * The third is the height. The card is never smaller than two rows and is as
  * tall as its content above that, so the list below starts lower by exactly
@@ -543,14 +543,17 @@ function renderCard(data) {
 
 const CHART_RANGES = globalThis.NS_CHART_RANGE ? globalThis.NS_CHART_RANGE.RANGES : [];
 
-/** Points needed before a line is worth drawing rather than two dots and a gap. */
-const CHART_MIN_POINTS = 3;
+/** Points needed before a line is worth drawing rather than two dots and a gap.
+ *  The number is owned by lib/chartRange.js, which is also the file that promises
+ *  no range can be thinner than it; the fallback only covers the library being
+ *  absent, which the manifest order should prevent. */
+const CHART_MIN_POINTS = globalThis.NS_CHART_RANGE ? globalThis.NS_CHART_RANGE.MIN_POINTS : 3;
 
 /* The whole series, fetched once per video and then re-cut locally for each
    range. It used to be a request per tab, which meant the age ranges - the ones
-   measured from publication - could not work: they all need the same readings,
-   only counted from a different day. One request for the full window, four
-   ranges cut from it, and switching tabs costs nothing and cannot race. */
+    measured from publication - could not work: they all need the same readings,
+    only counted from a different day. One request for the full window, every
+    range cut from it, and switching tabs costs nothing and cannot race. */
 let chartState = { videoId: null, range: "7d", data: null, loaded: false };
 
 function chartHost() {
@@ -610,7 +613,14 @@ function openChart() {
  * it is whole, and the note under the chart says which piece is missing.
  */
 function paintChart(box, data, rangeKey) {
-  const ranges = globalThis.NS_CHART_RANGE ? globalThis.NS_CHART_RANGE.RANGES : CHART_RANGES;
+  const lib = globalThis.NS_CHART_RANGE;
+  const ranges = lib ? lib.RANGES : CHART_RANGES;
+  // No library, or no ranges in it. One note beats a TypeError that would take
+  // the rest of the card down with it.
+  if (!lib || !ranges.length) {
+    box.innerHTML = '<p class="ns-note">The growth chart is unavailable.</p>';
+    return;
+  }
   const range = ranges.find((r) => r.key === rangeKey) || ranges[0];
   const tabs = `<div class="ns-chart-tabs" role="group" aria-label="Time range">${ranges
     .map((r) => `<button class="ns-chart-tab" type="button" data-range="${r.key}" aria-pressed="${r.key === range.key}">${r.label}</button>`)
@@ -641,7 +651,7 @@ function paintChart(box, data, rangeKey) {
     return;
   }
 
-  const pick = globalThis.NS_CHART_RANGE.select(points, {
+  const pick = lib.select(points, {
     range: range.key,
     publishedAt: cardState.publishedAt,
     now: Date.now()
@@ -666,7 +676,7 @@ function paintChart(box, data, rangeKey) {
   // The path arithmetic lives in lib/chartRange.js, not here, because a flat
   // series is a real case and a special case buried in a template string is a
   // special case nobody finds again.
-  const g = globalThis.NS_CHART_RANGE.geometry(shown, { width: 260, height: 88 });
+  const g = lib.geometry(shown, { width: 260, height: 88 });
   const W = g.width;
   const H = g.height;
 
@@ -684,12 +694,21 @@ function paintChart(box, data, rangeKey) {
     ? ""
     : ` <span class="ns-chart-delta">${gained >= 0 ? "+" : ""}${fmtT(gained)} · ${fmtT(perDay)}/day</span>`;
 
+  // The label is the whole chart to a screen reader, so the verb has to match the
+  // path: "rising" over a falling series tells the reader the opposite of the
+  // picture. A flat series has no span to rise or fall across, so it is named
+  // once rather than "unchanged at X to X".
+  const trend = g.flat ? "unchanged" : gained > 0 ? "rising" : gained < 0 ? "falling" : "level";
+  const ariaLabel = g.flat
+    ? `Views unchanged at ${fmtT(first)} across ${shown.length} days`
+    : `Views ${trend} from ${fmtT(first)} to ${fmtT(last)} across ${shown.length} days`;
+
   box.innerHTML =
     tabs +
     `<div class="ns-chart-num">${fmtT(last)}</div>` +
     `<div class="ns-chart-lab">views${delta}</div>` +
     `<svg class="ns-chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" ` +
-    `aria-label="Views ${g.flat ? "unchanged at" : "rising from"} ${fmtT(first)} to ${fmtT(last)} across ${shown.length} days">` +
+    `aria-label="${ariaLabel}">` +
     `<defs><linearGradient id="ns-chart-gradient" x1="0" y1="0" x2="0" y2="1">` +
     `<stop class="ns-chart-stop-0" offset="0"/><stop class="ns-chart-stop-1" offset="1"/>` +
     `</linearGradient></defs>` +
