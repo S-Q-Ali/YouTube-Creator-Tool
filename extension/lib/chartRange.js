@@ -19,15 +19,21 @@
  * right one. So a selection carries whether it is whole, whether the video has
  * simply not lived that long yet, and which piece is missing.
  *
- * 24h is the deliberate exception: trailing, not aged. Nobody opens a video to
- * see its first day.
- *
  * No module system in a content script, so this follows the pattern the other
  * extension libraries use and hangs off globalThis.
  */
 
 (function attach(global) {
   const DAY_MS = 86_400_000;
+
+  /*
+   * The fewest readings a line is worth drawing across. It lives here, next to
+   * the ranges it constrains, rather than in the card: the rule "no range may be
+   * thinner than a line needs" is a statement about these ranges, and a constant
+   * copied into a renderer and a test is a number three places can disagree
+   * about.
+   */
+  const MIN_POINTS = 3;
 
   /*
    * There is no 24-hour range here, and that is a decision about the data rather
@@ -42,7 +48,7 @@
    *
    * The shortest range has to be able to hold enough points to be a chart, and
    * that is enforced rather than remembered: a test asserts no range here can
-   * ever be thinner than the three points a line needs.
+   * ever be thinner than MIN_POINTS.
    */
   const RANGES = [
     { key: "7d", label: "1st 7d", kind: "age", days: 7 },
@@ -79,16 +85,6 @@
     if (!range) return { points: list, truncated: false, incomplete: false, reason: null };
 
     if (range.kind === "all") return { points: list, truncated: false, incomplete: false, reason: null };
-
-    if (range.kind === "trailing") {
-      const from = now - range.days * DAY_MS;
-      return {
-        points: list.filter((p) => p.t >= from),
-        truncated: false,
-        incomplete: false,
-        reason: null
-      };
-    }
 
     // The string is checked before it is parsed, and not after. `Number(null)`
     // is 0 and 0 is finite, so parsing first turns an absent publish date into a
@@ -152,7 +148,12 @@
     const W = (options && options.width) || 260;
     const H = (options && options.height) || 88;
     const M = 8; // keeps the stroke and the tallest point off the edge
-    const views = points.map((p) => p.views);
+    const list = Array.isArray(points) ? points : [];
+    const views = list.map((p) => p.views);
+    // Nothing to draw. The card guards this with MIN_POINTS, but the arithmetic
+    // below would take [] and reach Math.min() -> Infinity, so the empty case is
+    // answered here rather than trusted to every caller.
+    if (!views.length) return { line: "", area: null, flat: false, width: W, height: H };
     const lo = Math.min(...views);
     const hi = Math.max(...views);
     const flat = hi === lo;
@@ -172,5 +173,5 @@
     return { line, area, flat, width: W, height: H };
   }
 
-  global.NS_CHART_RANGE = { RANGES, select, geometry, DAY_MS };
+  global.NS_CHART_RANGE = { RANGES, MIN_POINTS, select, geometry, DAY_MS };
 })(globalThis);
