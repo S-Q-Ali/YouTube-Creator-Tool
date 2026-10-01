@@ -65,6 +65,8 @@ interface Provider {
   name: string;
   baseUrl: string;
   model: string;
+  /** Optional custom endpoint; Google's Gemini API is not OpenAI-shaped. */
+  buildUrl?: (p: Provider) => string;
   formatRequest: (prompt: string, temperature: number) => RequestInit;
   parseResponse: (res: Response) => Promise<string>;
 }
@@ -99,6 +101,33 @@ function getProviders(): Provider[] {
     });
   }
 
+  if (process.env.AIHUBMIX_API_KEY) {
+    providers.push({
+      name: "aihubmix",
+      baseUrl: "https://aihubmix.com/v1",
+      model: "qwen3.7-plus-preview-free",
+      formatRequest: (prompt: string, temperature: number) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.AIHUBMIX_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "qwen3.7-plus-preview-free",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 4096,
+          temperature,
+        }),
+      }),
+      parseResponse: async (res: Response) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await res.json();
+        if (data.error) throw new Error(`AiHubMix error: ${data.error.message || JSON.stringify(data.error)}`);
+        return stripThinkingTags(data.choices?.[0]?.message?.content || "");
+      },
+    });
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     providers.push({
       name: "openrouter",
@@ -128,13 +157,41 @@ function getProviders(): Provider[] {
     });
   }
 
+  if (process.env.GOOGLE_AI_API_KEY) {
+    providers.push({
+      name: "google",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-2.0-flash",
+      // Gemini is not OpenAI-shaped: its own endpoint, the key in the query
+      // string, and a contents/generationConfig body. Same provider as
+      // lib/aiAnalysis.ts, so both paths fail over through the same keys.
+      buildUrl: (p) => `${p.baseUrl}/models/${p.model}:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+      formatRequest: (prompt: string, temperature: number) => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 4096, temperature },
+        }),
+      }),
+      parseResponse: async (res: Response) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await res.json();
+        if (data.error) throw new Error(`Google AI error: ${JSON.stringify(data.error)}`);
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      },
+    });
+  }
+
   return providers;
 }
 
 async function callLLM(prompt: string, temperature = 0.7): Promise<string> {
   const providers = getProviders();
   if (providers.length === 0) {
-    throw new Error("No AI providers configured. Add GROQ_API_KEY or OPENROUTER_API_KEY to .env.local");
+    throw new Error(
+      "No AI providers configured. Add GROQ_API_KEY, AIHUBMIX_API_KEY, OPENROUTER_API_KEY, or GOOGLE_AI_API_KEY to .env.local"
+    );
   }
 
   let lastError: Error | null = null;
@@ -146,7 +203,8 @@ async function callLLM(prompt: string, temperature = 0.7): Promise<string> {
         await new Promise((r) => setTimeout(r, delay));
       }
       try {
-        const res = await fetch(`${provider.baseUrl}/chat/completions`, {
+        const url = provider.buildUrl ? provider.buildUrl(provider) : `${provider.baseUrl}/chat/completions`;
+        const res = await fetch(url, {
           ...provider.formatRequest(prompt, temperature),
           signal: AbortSignal.timeout(120000),
         });
