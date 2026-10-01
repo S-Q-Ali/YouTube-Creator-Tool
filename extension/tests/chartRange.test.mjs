@@ -181,6 +181,15 @@ describe("drawing the series", () => {
     expect(at([500, 600, 500]).area).toContain("Z");
   });
 
+  it("returns an empty, unused shape for an empty series", () => {
+    // Nothing can select this - select hands back points, and the card refuses
+    // to draw under MIN_POINTS - but geometry is exported, and the old
+    // arithmetic turned [] into an infinite span and a nonsense path.
+    const g = R().geometry([]);
+    expect(g.line).toBe("");
+    expect(g.area).toBeNull();
+  });
+
   it("closes a moving series to the baseline so the area is fillable", () => {
     const g = at([1, 2, 3]);
     expect(g.flat).toBe(false);
@@ -209,14 +218,14 @@ describe("the range tabs themselves", () => {
     // reasonable and could not draw a chart in any circumstance.
     //
     // So the rule is structural rather than a matter of taste: no range may be
-    // short enough to be unable to hold CHART_MIN_POINTS. If someone adds a
-    // shorter range later, this fails and asks whether the readings are daily
-    // enough to support it.
-    const MIN = 3; // the card's CHART_MIN_POINTS: fewer than this draws no line
+    // short enough to be unable to hold MIN_POINTS. If someone adds a shorter
+    // range later, this fails and asks whether the readings are daily enough to
+    // support it.
+    const MIN = R().MIN_POINTS; // owned by the library, not copied here
     for (const r of R().RANGES) {
       if (r.kind === "all") continue;
       // An age range holds day 0 through day N inclusive.
-      const cap = r.kind === "trailing" ? r.days : r.days + 1;
+      const cap = r.days + 1;
       expect(cap, `range "${r.label}" can hold at most ${cap} points, so it can never draw a line`).toBeGreaterThanOrEqual(MIN);
     }
   });
